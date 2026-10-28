@@ -1,0 +1,3179 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LTMPS Kahoot! 小五數學即時問答比賽</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Noto Sans TC & Fredoka -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            background-color: #46178f;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 30%);
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Kahoot 經典立體按鈕特效 */
+        .btn-3d-purple {
+            background-color: #46178f;
+            box-shadow: 0 6px 0 #250952;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-purple:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #250952;
+        }
+
+        .btn-3d-dark {
+            background-color: #333333;
+            box-shadow: 0 6px 0 #111111;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-dark:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #111111;
+        }
+
+        /* 四色選項按鈕 */
+        .kahoot-red {
+            background-color: #e21b3c;
+            box-shadow: 0 8px 0 #9c1128;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-red:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #9c1128;
+        }
+
+        .kahoot-blue {
+            background-color: #1368ce;
+            box-shadow: 0 8px 0 #0c4589;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-blue:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #0c4589;
+        }
+
+        .kahoot-yellow {
+            background-color: #d89e00;
+            box-shadow: 0 8px 0 #946c00;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-yellow:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #946c00;
+        }
+
+        .kahoot-green {
+            background-color: #26890c;
+            box-shadow: 0 8px 0 #185707;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-green:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #185707;
+        }
+
+        /* 直式分數顯示樣式 */
+        .frac-box {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            margin: 0 0.2em;
+            line-height: 1.05;
+            font-weight: 900;
+        }
+        .frac-num {
+            border-bottom: 2.5px solid currentColor;
+            padding: 0 0.28em 0.08em;
+            font-size: 0.85em;
+        }
+        .frac-den {
+            padding: 0.08em 0.28em 0;
+            font-size: 0.85em;
+        }
+
+        /* 漂浮背景幾何圖形 */
+        .bg-shape {
+            position: fixed;
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatShape 18s infinite ease-in-out;
+        }
+        @keyframes floatShape {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(15deg); }
+        }
+
+        /* 彈跳動畫 */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.55);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white flex flex-col justify-between relative">
+
+    <!-- 背景幾何裝飾 -->
+    <div class="bg-shape text-9xl top-10 left-10"><i class="fa-solid fa-play -rotate-90"></i></div>
+    <div class="bg-shape text-9xl bottom-12 right-12" style="animation-delay: -5s;"><i class="fa-solid fa-square rotate-45"></i></div>
+    <div class="bg-shape text-8xl top-1/3 right-16" style="animation-delay: -9s;"><i class="fa-solid fa-circle"></i></div>
+    <div class="bg-shape text-8xl bottom-1/4 left-20" style="animation-delay: -13s;"><i class="fa-solid fa-square"></i></div>
+
+    <!-- 頂部導覽列 -->
+    <header class="relative z-20 bg-black/25 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-white/10">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="confirmReturnHome()">
+            <div class="bg-white text-[#46178f] font-black text-xl md:text-2xl px-3 py-1 rounded-xl shadow-md tracking-tight flex items-center gap-1.5">
+                <i class="fa-solid fa-shapes text-amber-500"></i>
+                <span>LTMPS Kahoot!</span>
+            </div>
+            <span class="hidden sm:inline-block text-xs md:text-sm font-bold bg-purple-800/80 border border-purple-400/30 px-2.5 py-1 rounded-full text-purple-100">
+                小五數學互動競答平台
+            </span>
+        </div>
+
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- 連線狀態指示 -->
+            <div id="connectionBadge" class="flex items-center gap-1.5 text-xs bg-emerald-900/70 border border-emerald-400/40 px-2.5 py-1.5 rounded-full">
+                <span id="connDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="connText" class="hidden md:inline">即時連線中</span>
+            </div>
+
+            <!-- 音效開關 -->
+            <button id="soundToggleBtn" onclick="toggleSound()" class="bg-white/15 hover:bg-white/25 active:scale-95 transition px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5" title="開關音效">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-amber-300"></i>
+                <span id="soundText" class="hidden sm:inline">音效開</span>
+            </button>
+
+            <!-- 返回主頁按鈕 -->
+            <button id="leaveBtn" onclick="confirmReturnHome()" class="hidden bg-rose-600 hover:bg-rose-500 active:scale-95 transition px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>離開房間</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="relative z-10 flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-6xl mx-auto">
+
+        <!-- ==================== VIEW 1: 主頁面 (HOME) ==================== -->
+        <section id="view-home" class="w-full max-w-4xl animate-pop">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center gap-2 bg-amber-400 text-purple-950 font-black px-4 py-1 rounded-full text-sm mb-3 shadow-md">
+                    <i class="fa-solid fa-bolt"></i> LTMPS Kahoot! 五年級數學互動競答與自學平台
+                </div>
+                <h1 class="text-4xl sm:text-6xl font-black tracking-tight drop-shadow-[0_4px_0_rgba(0,0,0,0.4)] mb-2">
+                    LTMPS Kahoot! 數學大挑戰
+                </h1>
+                <p class="text-purple-200 text-base sm:text-lg font-medium">
+                    支援全班即時連線比賽，或隨時隨地開啟「單人自學模式」挑戰小五分數題庫！
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+                <!-- 入口 1：學生加入房間 (多人比賽) -->
+                <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-7 shadow-2xl border-b-8 border-gray-300 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="bg-blue-100 text-blue-800 font-black px-3 py-1 rounded-lg text-sm">學生多人參賽</span>
+                            <i class="fa-solid fa-gamepad text-3xl text-blue-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-black mb-2 text-gray-900">加入比賽房間</h2>
+                        <p class="text-gray-500 text-sm mb-5">請輸入老師螢幕上顯示的極短房號 (1 - 99)</p>
+
+                        <div class="mb-4">
+                            <input id="joinPinInput" type="number" min="1" max="999" placeholder="輸入房號 (如: 8)"
+                                class="w-full text-center text-3xl font-black py-3.5 px-4 rounded-2xl border-4 border-gray-300 focus:border-purple-600 focus:outline-none bg-gray-50 text-gray-900 tracking-widest transition"
+                                onkeydown="if(event.key==='Enter') handleCheckRoomPin()">
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="handleCheckRoomPin()" class="w-full btn-3d-dark text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <span>進入房間</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- 入口 2：學生單人自學模式 (無需房號/離線可玩) -->
+                <div class="bg-gradient-to-br from-emerald-600 to-teal-800 text-white rounded-3xl p-6 sm:p-7 shadow-2xl border-b-8 border-teal-950 flex flex-col justify-between relative overflow-hidden">
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="bg-amber-300 text-teal-950 font-black px-3 py-1 rounded-lg text-sm">學生自主練習</span>
+                            <i class="fa-solid fa-user-graduate text-3xl text-amber-300"></i>
+                        </div>
+                        <h2 class="text-2xl font-black mb-2">單人自學模式</h2>
+                        <p class="text-emerald-100 text-sm mb-4">無需房號！自由挑選單元、題數及限時或無限時間練習。</p>
+
+                        <ul class="space-y-1.5 text-xs sm:text-sm text-emerald-50 mb-6 font-medium">
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-amber-300"></i> 每題即時對答案 + 通分與約分算式詳解</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-amber-300"></i> 支援「無限時間輕鬆練」或「計時挑戰」</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-amber-300"></i> 專屬「錯題溫習冊」與「一鍵重練錯題」</li>
+                        </ul>
+                    </div>
+
+                    <button type="button" onclick="openSetupModal('solo')" class="relative z-10 w-full bg-amber-400 hover:bg-amber-300 text-teal-950 text-xl font-black py-4 rounded-2xl shadow-[0_6px_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_#b45309] transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                        <span>開始單人自學</span>
+                    </button>
+                </div>
+
+                <!-- 入口 3：老師創建房間 -->
+                <div class="bg-gradient-to-br from-purple-700 to-indigo-900 text-white rounded-3xl p-6 sm:p-7 shadow-2xl border-b-8 border-indigo-950 flex flex-col justify-between relative overflow-hidden">
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="bg-amber-400 text-purple-950 font-black px-3 py-1 rounded-lg text-sm">老師主持入口</span>
+                            <i class="fa-solid fa-chalkboard-user text-3xl text-amber-300"></i>
+                        </div>
+                        <h2 class="text-2xl font-black mb-2">創建比賽房間</h2>
+                        <p class="text-purple-200 text-sm mb-4">自訂題數、每題限時及考核單元，在大螢幕投影主持全班比賽！</p>
+
+                        <ul class="space-y-1.5 text-xs sm:text-sm text-purple-100 mb-6 font-medium">
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 自動分配極短房號 (1-2位數字)</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 涵蓋「擴分/約分」及「異分母分數加減」</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 即時排行榜、分數變化與 CSV 匯出</li>
+                        </ul>
+                    </div>
+
+                    <button type="button" onclick="openSetupModal('host')" class="relative z-10 w-full bg-white hover:bg-purple-50 text-purple-950 text-xl font-black py-4 rounded-2xl shadow-[0_6px_0_#9ca3af] active:translate-y-1 active:shadow-[0_2px_0_#9ca3af] transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-purple-700"></i>
+                        <span>創建比賽房間</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 2: 題目與模式設定 (老師開房 & 學生單人自學共用) ==================== -->
+        <section id="view-host-setup" class="hidden w-full max-w-4xl animate-pop">
+            <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300">
+                <div class="flex items-center justify-between border-b pb-4 mb-5">
+                    <div class="flex items-center gap-3">
+                        <div id="setupHeaderIcon" class="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl font-black">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <div>
+                            <h2 id="setupHeaderTitle" class="text-2xl font-black text-gray-900">房間與題目設定</h2>
+                            <p id="setupHeaderSub" class="text-xs sm:text-sm text-gray-500">系統將根據所選小五單元隨機生成高誘導性題目（分數須以最簡分數／最簡假分數作答）</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="showView('view-home')" class="text-gray-400 hover:text-gray-700 p-2 text-xl">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- 1. 挑選單元 -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                            1. 挑選五年級考核單元（可多選）
+                        </label>
+                        <div class="flex gap-2 text-xs">
+                            <button type="button" onclick="toggleAllTopics(true)" class="text-purple-700 font-bold hover:underline">全選</button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="toggleAllTopics(false)" class="text-gray-500 font-bold hover:underline">全部取消</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-4 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-expand-reduce" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-base">擴分/約分</div>
+                                <div class="text-xs text-gray-600 mt-1">尋找等值分數、擴分與約分求未知分子或分母、將分數約簡成「最簡分數」或「最簡假分數」</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-4 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-fraction-add-sub" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-base">異分母分數加減</div>
+                                <div class="text-xs text-gray-600 mt-1">異分母分數加法、減法、三個分數加減混合計算及應用題（答案必須以「最簡分數」或「最簡假分數」作答）</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2. 題目數目 & 3. 每題作答時間 (支援快速按鈕 + 手動輸入自訂) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                                2. 題目數目 (可手動輸入)
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <input id="customQCountInput" type="number" min="1" max="50" value="10"
+                                    oninput="handleCustomInput('qCount', this.value)"
+                                    class="w-20 text-center font-black text-lg py-1 px-2 rounded-xl border-2 border-purple-500 bg-purple-50 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                <span class="text-xs font-black text-gray-600">題</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2" id="qCountSelector">
+                            <button type="button" onclick="selectOption('qCount', 5)" data-val="5" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">5 題</button>
+                            <button type="button" onclick="selectOption('qCount', 10)" data-val="10" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-sm">10 題</button>
+                            <button type="button" onclick="selectOption('qCount', 15)" data-val="15" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">15 題</button>
+                            <button type="button" onclick="selectOption('qCount', 20)" data-val="20" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">20 題</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                                3. 每題作答時間 (可手動輸入)
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <input id="customTimeLimitInput" type="number" min="0" max="300" value="30"
+                                    oninput="handleCustomInput('timeLimit', this.value)"
+                                    class="w-20 text-center font-black text-lg py-1 px-2 rounded-xl border-2 border-purple-500 bg-purple-50 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                <span id="timeUnitLabel" class="text-xs font-black text-gray-600">秒</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5" id="timeLimitSelector">
+                            <button type="button" onclick="selectOption('timeLimit', 20)" data-val="20" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">20秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 30)" data-val="30" class="time-btn py-2.5 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-xs sm:text-sm">30秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 45)" data-val="45" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">45秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 60)" data-val="60" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">60秒</button>
+                            <button type="button" id="unlimitedTimeBtn" onclick="selectOption('timeLimit', 0)" data-val="0" class="hidden time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">無限時</button>
+                            <button type="button" id="host90TimeBtn" onclick="selectOption('timeLimit', 90)" data-val="90" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">90秒</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 出題形式 -->
+                <div class="mb-8">
+                    <label class="block text-sm font-black text-gray-700 uppercase tracking-wider mb-2">
+                        4. 作答模式
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button type="button" onclick="selectOption('qFormat', 'mixed')" data-val="mixed" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-sm">
+                            <i class="fa-solid fa-shuffle mr-1"></i> 選擇題 + 填充題混合
+                        </button>
+                        <button type="button" onclick="selectOption('qFormat', 'mc')" data-val="mc" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">
+                            <i class="fa-solid fa-table-cells-large mr-1"></i> 全部選擇題
+                        </button>
+                        <button type="button" onclick="selectOption('qFormat', 'fill')" data-val="fill" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">
+                            <i class="fa-solid fa-keyboard mr-1"></i> 優先填充題
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="showView('view-home')" class="w-1/3 py-4 rounded-2xl font-black text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                        返回
+                    </button>
+                    <button type="button" id="createRoomSubmitBtn" onclick="handleSetupPrimaryAction()" class="w-2/3 btn-3d-purple text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rocket"></i>
+                        <span id="setupPrimaryBtnText">立即開啟房間</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 3: 學生填寫學號與姓名 (STUDENT PROFILE) ==================== -->
+        <section id="view-student-profile" class="hidden w-full max-w-md animate-pop">
+            <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300">
+                <div class="text-center mb-6">
+                    <span class="inline-block bg-purple-100 text-purple-800 font-black px-4 py-1 rounded-full text-sm mb-2">
+                        房號：<span id="studentJoinPinDisplay" class="text-lg">8</span>
+                    </span>
+                    <h2 class="text-2xl sm:text-3xl font-black text-gray-900">輸入參賽資料</h2>
+                    <p class="text-gray-500 text-sm">請選擇你的學號並輸入姓名</p>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-black text-gray-700 mb-1.5">選擇學號</label>
+                        <select id="studentClassNo" class="w-full text-xl font-black py-3.5 px-4 rounded-2xl border-3 border-gray-300 bg-gray-50 text-gray-900 focus:border-purple-600 focus:outline-none">
+                            <!-- 由 JS 生成 1 - 35 號 -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-black text-gray-700 mb-1.5">輸入姓名</label>
+                        <input id="studentNameInput" type="text" maxlength="12" placeholder="例如：陳小明"
+                            class="w-full text-xl font-black py-3.5 px-4 rounded-2xl border-3 border-gray-300 bg-gray-50 text-gray-900 focus:border-purple-600 focus:outline-none"
+                            onkeydown="if(event.key==='Enter') handleStudentJoinLobby()">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="showView('view-home')" class="w-1/3 py-4 rounded-2xl font-black text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                        返回
+                    </button>
+                    <button onclick="handleStudentJoinLobby()" class="w-2/3 kahoot-green text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <span>加入比賽！</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 4: 等候大廳 (LOBBY - 老師與學生共用架構) ==================== -->
+        <section id="view-lobby" class="hidden w-full animate-pop">
+            <!-- 頂部超大房號橫幅 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300 mb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="text-center md:text-left">
+                    <div class="text-sm sm:text-base font-black text-purple-700 uppercase tracking-wider mb-1">
+                        請學生進入本網頁並輸入房號：
+                    </div>
+                    <div class="flex items-center justify-center md:justify-start gap-4">
+                        <div id="lobbyPinNumber" class="text-6xl sm:text-8xl font-black tracking-tighter text-gray-900 bg-amber-300 px-6 py-2 rounded-3xl shadow-inner border-4 border-amber-400">
+                            --
+                        </div>
+                        <div class="text-left space-y-1">
+                            <div id="lobbyConfigSummary" class="text-xs sm:text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                                10 題 · 每題 30 秒
+                            </div>
+                            <div id="lobbyTopicsSummary" class="text-xs font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-xl">
+                                單元：擴分/約分、異分母分數加減
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 老師端顯示「開始比賽」按鈕；學生端顯示等候提示 -->
+                <div id="hostLobbyActions" class="hidden flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <button onclick="handleRegenerateQuestions()" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-800 font-black px-4 py-4 rounded-2xl text-sm transition flex items-center justify-center gap-1.5" title="重新抽題">
+                        <i class="fa-solid fa-rotate"></i> 重新抽題
+                    </button>
+                    <button id="startGameBtn" onclick="hostStartGame()" class="w-full sm:w-auto kahoot-green text-white text-2xl font-black px-8 py-4 rounded-2xl flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-play"></i>
+                        <span>開始比賽</span>
+                    </button>
+                </div>
+
+                <div id="studentLobbyBadge" class="hidden bg-emerald-50 border-2 border-emerald-500 text-emerald-900 px-6 py-4 rounded-2xl text-center">
+                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-700">你已成功加入</div>
+                    <div id="studentSelfTag" class="text-2xl font-black mt-0.5">[1號] 陳小明</div>
+                    <div class="text-xs text-emerald-600 mt-1 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-spinner fa-spin"></i> 等待老師按「開始比賽」...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 已加入學生列表 -->
+            <div class="bg-black/25 backdrop-blur-md rounded-3xl p-6 border border-white/15">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2 text-lg sm:text-xl font-black">
+                        <i class="fa-solid fa-users text-amber-300"></i>
+                        <span>已加入學生 (<span id="lobbyPlayerCount">0</span> 人)</span>
+                    </div>
+                    <span id="hostKickHint" class="hidden text-xs text-purple-200">
+                        <i class="fa-solid fa-hand-pointer mr-1"></i>老師點擊學生名牌可將其移出房間
+                    </span>
+                </div>
+
+                <div id="lobbyPlayersGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 min-h-[120px] content-start">
+                    <!-- 動態生成學生卡片 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 5: 題目作答畫面 (QUESTION PHASE) ==================== -->
+        <section id="view-question" class="hidden w-full flex-1 flex flex-col justify-between animate-pop">
+            <!-- 頂部狀態列：題號、倒數進度條、已答人數 -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2 gap-2">
+                    <div class="flex items-center gap-2">
+                        <span id="qProgressBadge" class="bg-white text-purple-950 font-black px-3.5 py-1 rounded-full text-sm sm:text-base shadow">
+                            第 1 / 10 題
+                        </span>
+                        <span id="qTopicBadge" class="bg-purple-800/90 border border-purple-400/30 text-purple-100 font-bold px-3 py-1 rounded-full text-xs sm:text-sm">
+                            擴分/約分
+                        </span>
+                    </div>
+
+                    <!-- 學生端顯示自己分數與連續答對 -->
+                    <div id="studentScoreHeader" class="hidden items-center gap-2">
+                        <span id="studentStreakBadge" class="hidden bg-orange-500 text-white font-black px-3 py-1 rounded-full text-xs sm:text-sm shadow items-center gap-1">
+                            <i class="fa-solid fa-fire"></i> <span id="studentStreakCount">2</span> 連勝
+                        </span>
+                        <span class="bg-black/40 border border-white/20 px-3.5 py-1 rounded-full text-sm font-black">
+                            總分：<span id="studentCurrentScore" class="text-amber-300">0</span>
+                        </span>
+                    </div>
+
+                    <!-- 老師端顯示作答人數與提前結算按鈕 -->
+                    <div id="hostQuestionControls" class="hidden items-center gap-3">
+                        <div class="bg-black/40 border border-white/20 px-4 py-1 rounded-full text-sm font-black">
+                            已作答：<span id="hostAnsweredCount" class="text-amber-300 text-base">0 / 0</span>
+                        </div>
+                        <button onclick="hostEndQuestionNow()" class="bg-amber-400 hover:bg-amber-300 text-purple-950 font-black px-3.5 py-1 rounded-full text-xs sm:text-sm shadow active:scale-95 transition">
+                            立即揭曉 <i class="fa-solid fa-forward-step ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 動態時間條 -->
+                <div class="w-full bg-black/40 h-4 rounded-full overflow-hidden p-0.5 border border-white/15">
+                    <div id="timerBar" class="bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 h-full rounded-full transition-all duration-200" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- 中央：題目白板與倒數秒數球 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-10 shadow-2xl border-b-8 border-gray-300 my-auto relative flex flex-col items-center justify-center min-h-[180px] sm:min-h-[230px]">
+                <!-- 倒數計時圓圈 -->
+                <div class="-mt-12 sm:-mt-14 mb-3 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-purple-800 border-4 border-white shadow-xl flex items-center justify-center text-white font-black text-2xl sm:text-3xl" id="timerCircle">
+                    30
+                </div>
+
+                <!-- 題目文字 -->
+                <h2 id="questionText" class="text-2xl sm:text-4xl md:text-5xl font-black text-center leading-snug tracking-tight text-gray-900">
+                    計算：3/4 + 5/6 = _____
+                </h2>
+
+                <p id="questionSubHint" class="text-xs sm:text-sm font-bold text-gray-500 mt-3 text-center">
+                    請以「最簡分數」或「最簡假分數」作答 · 愈快答對分數愈高！
+                </p>
+            </div>
+
+            <!-- 底部：作答區（選擇題 4 色按鈕 / 填充題數字與分數鍵盤 / 已作答等候遮罩） -->
+            <div class="mt-6">
+                <!-- 模式 A：選擇題 4 個按鈕 -->
+                <div id="mcAnswerArea" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <button onclick="submitStudentAnswer(0)" id="mc-btn-0" class="kahoot-red text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-play -rotate-90"></i>
+                        </div>
+                        <span id="mc-text-0" class="text-xl sm:text-3xl font-black break-all">19/12</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(1)" id="mc-btn-1" class="kahoot-blue text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-square rotate-45"></i>
+                        </div>
+                        <span id="mc-text-1" class="text-xl sm:text-3xl font-black break-all">8/10</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(2)" id="mc-btn-2" class="kahoot-yellow text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-circle"></i>
+                        </div>
+                        <span id="mc-text-2" class="text-xl sm:text-3xl font-black break-all">38/24</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(3)" id="mc-btn-3" class="kahoot-green text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-square"></i>
+                        </div>
+                        <span id="mc-text-3" class="text-xl sm:text-3xl font-black break-all">7/12</span>
+                    </button>
+                </div>
+
+                <!-- 模式 B：填充題輸入與分數/數字鍵盤 -->
+                <div id="fillAnswerArea" class="hidden max-w-md mx-auto bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/20">
+                    <!-- 學生輸入框與虛擬數字鍵盤 -->
+                    <div id="studentFillControls">
+                        <div class="flex gap-2 mb-2.5">
+                            <input id="fillInputBox" type="text" inputmode="text" placeholder="輸入數字或最簡分數 (如 7/4)"
+                                class="w-full text-center text-2xl sm:text-3xl font-black py-3 px-4 rounded-2xl bg-white text-gray-900 border-4 border-purple-300 focus:border-amber-400 focus:outline-none"
+                                onkeydown="if(event.key==='Enter') submitFillAnswer()">
+                            <button onclick="submitFillAnswer()" class="kahoot-green text-white font-black px-6 rounded-2xl text-lg shrink-0">
+                                提交
+                            </button>
+                        </div>
+                        <!-- 方便 iPad / 手機點擊的快速數字與分數線鍵盤 -->
+                        <div class="grid grid-cols-6 gap-1.5">
+                            <button type="button" onclick="appendFillDigit('1')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">1</button>
+                            <button type="button" onclick="appendFillDigit('2')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">2</button>
+                            <button type="button" onclick="appendFillDigit('3')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">3</button>
+                            <button type="button" onclick="appendFillDigit('4')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">4</button>
+                            <button type="button" onclick="appendFillDigit('5')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">5</button>
+                            <button type="button" onclick="clearFillInput()" class="bg-rose-500/80 hover:bg-rose-500 active:scale-95 py-2.5 rounded-xl font-black text-sm">清除</button>
+                            <button type="button" onclick="appendFillDigit('6')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">6</button>
+                            <button type="button" onclick="appendFillDigit('7')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">7</button>
+                            <button type="button" onclick="appendFillDigit('8')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">8</button>
+                            <button type="button" onclick="appendFillDigit('9')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">9</button>
+                            <button type="button" onclick="appendFillDigit('0')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">0</button>
+                            <button type="button" onclick="backspaceFillInput()" class="bg-amber-500/80 hover:bg-amber-500 active:scale-95 py-2.5 rounded-xl font-black text-sm"><i class="fa-solid fa-delete-left"></i></button>
+                            <button type="button" onclick="appendFillDigit('/')" class="col-span-6 bg-amber-400 hover:bg-amber-300 text-purple-950 active:scale-95 py-2.5 rounded-xl font-black text-sm sm:text-base shadow mt-0.5">
+                                輸入分數線「 / 」（格式：分子/分母，例如 7/4）
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 老師端填充題提示 -->
+                    <div id="hostFillNotice" class="hidden text-center py-4">
+                        <div class="text-xl font-black text-amber-300"><i class="fa-solid fa-keyboard mr-2"></i>此題為填充題</div>
+                        <p class="text-sm text-purple-200 mt-1">學生正在裝置上輸入答案（數字或最簡分數 分子/分母）...</p>
+                    </div>
+                </div>
+
+                <!-- 學生已提交答案後的鎖定等待畫面 -->
+                <div id="studentSubmittedWait" class="hidden bg-indigo-950/90 border-2 border-indigo-400/40 rounded-3xl p-6 text-center shadow-xl">
+                    <div class="w-14 h-14 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center text-2xl font-black mx-auto mb-3 animate-bounce">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <h3 class="text-2xl font-black">答案已送出！</h3>
+                    <p id="studentSubmittedChoiceText" class="text-purple-200 text-sm mt-1">你的作答：19/12</p>
+                    <p class="text-xs text-amber-300 mt-3 font-bold">請等待所有同學完成作答，即將公佈答案與排行榜...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 6: 每題結果與即時排行榜 (RESULT & LEADERBOARD) ==================== -->
+        <section id="view-leaderboard" class="hidden w-full max-w-4xl animate-pop">
+            <!-- 學生個人本題結果橫幅 -->
+            <div id="studentRoundFeedback" class="hidden mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div id="feedbackIconBox" class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl font-black">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <h3 id="feedbackTitle" class="text-2xl font-black">答對了！太棒了！</h3>
+                        <p id="feedbackSub" class="text-sm opacity-90">反應神速！目前排在第 1 名</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="feedbackDelta" class="text-3xl font-black bg-black/25 px-4 py-1.5 rounded-2xl">+890</div>
+                </div>
+            </div>
+
+            <!-- 正確答案與小五數學詳解卡 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-5 sm:p-6 shadow-2xl border-b-8 border-gray-300 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+                    <div>
+                        <span id="reviewTopicTag" class="text-xs font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2.5 py-1 rounded-md">
+                            題目回顧
+                        </span>
+                        <h3 id="reviewQuestionText" class="text-lg sm:text-2xl font-black text-gray-800 mt-1">
+                            計算：3/4 + 5/6 = _____
+                        </h3>
+                    </div>
+                    <div class="bg-emerald-50 border-2 border-emerald-500 px-4 py-2.5 rounded-2xl shrink-0 text-center sm:text-right">
+                        <div class="text-xs font-bold text-emerald-700">正確答案</div>
+                        <div id="reviewCorrectAnswer" class="text-2xl sm:text-3xl font-black text-emerald-800">19/12</div>
+                    </div>
+                </div>
+                <div class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <div class="flex items-start gap-2 text-gray-700 font-bold">
+                        <i class="fa-solid fa-lightbulb text-amber-500 mt-1"></i>
+                        <span id="reviewExplanation">解說：先通分，4 和 6 的最小公倍數是 12；9/12 + 10/12 = 19/12。</span>
+                    </div>
+                    <span id="reviewStatsBadge" class="text-xs font-black bg-gray-100 text-gray-600 px-3 py-1 rounded-full shrink-0 self-start sm:self-center">
+                        本題答對人數：0 / 0 人
+                    </span>
+                </div>
+            </div>
+
+            <!-- 即時積分排行榜及分數變化 (多人比賽顯示) -->
+            <div id="multiplayerLeaderboardCard" class="bg-black/30 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-white/15 shadow-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-trophy text-2xl text-amber-300"></i>
+                        <h3 class="text-xl sm:text-2xl font-black">即時排行榜 & 分數變化</h3>
+                    </div>
+
+                    <!-- 老師端「下一題 / 查看最終頒獎台」按鈕 -->
+                    <button type="button" id="hostNextQuestionBtn" onclick="hostNextQuestion()" class="hidden kahoot-blue text-white font-black px-6 py-3 rounded-2xl text-base sm:text-lg flex items-center gap-2">
+                        <span id="hostNextBtnText">下一題</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <div id="leaderboardList" class="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                    <!-- 動態生成排名列 -->
+                </div>
+            </div>
+
+            <!-- 單人自學模式專用：進度與「下一題」按鈕卡 -->
+            <div id="soloNextActionCard" class="hidden bg-black/30 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-white/15 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-400 text-purple-950 flex items-center justify-center text-2xl font-black">
+                        <i class="fa-solid fa-star"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-purple-200 font-bold">單人自學進度</div>
+                        <div id="soloReviewProgressText" class="text-lg sm:text-xl font-black">目前累積：0 分（答對 0 / 0 題）</div>
+                    </div>
+                </div>
+                <button type="button" onclick="soloNextQuestion()" class="w-full sm:w-auto kahoot-green text-white font-black px-8 py-4 rounded-2xl text-xl flex items-center justify-center gap-2 shadow-lg">
+                    <span id="soloNextBtnText">下一題</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 7: 最終頒獎台與總成績單 (PODIUM / FINAL) ==================== -->
+        <section id="view-podium" class="hidden w-full max-w-4xl animate-pop">
+            <div class="text-center mb-6">
+                <span class="bg-amber-400 text-purple-950 font-black px-4 py-1 rounded-full text-sm shadow">
+                    比賽圓滿結束！
+                </span>
+                <h2 class="text-3xl sm:text-5xl font-black mt-2 drop-shadow">
+                    <i class="fa-solid fa-crown text-amber-300 mr-2"></i>最終榮譽頒獎台
+                </h2>
+            </div>
+
+            <!-- 冠亞季軍頒獎台 -->
+            <div class="grid grid-cols-3 gap-2 sm:gap-4 items-end max-w-2xl mx-auto mb-8 pt-6 px-2">
+                <!-- 亞軍 (2nd) -->
+                <div id="podium-2" class="flex flex-col items-center">
+                    <div class="text-center mb-2">
+                        <div id="podium2-name" class="font-black text-sm sm:text-lg truncate max-w-[110px] sm:max-w-[160px]">---</div>
+                        <div id="podium2-score" class="text-xs sm:text-sm text-purple-200 font-bold">0 分</div>
+                    </div>
+                    <div class="w-full h-28 sm:h-36 bg-gradient-to-t from-slate-400 to-slate-200 text-slate-900 rounded-t-2xl shadow-xl flex flex-col items-center justify-start pt-3 border-t-4 border-white">
+                        <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-slate-700 text-white flex items-center justify-center font-black text-lg sm:text-xl shadow">2</div>
+                        <span class="text-xs font-black mt-1 uppercase opacity-75">亞軍</span>
+                    </div>
+                </div>
+
+                <!-- 冠軍 (1st) -->
+                <div id="podium-1" class="flex flex-col items-center">
+                    <div class="text-amber-300 text-3xl mb-1 animate-bounce"><i class="fa-solid fa-crown"></i></div>
+                    <div class="text-center mb-2">
+                        <div id="podium1-name" class="font-black text-base sm:text-xl text-amber-300 truncate max-w-[120px] sm:max-w-[180px]">---</div>
+                        <div id="podium1-score" class="text-xs sm:text-base text-white font-black">0 分</div>
+                    </div>
+                    <div class="w-full h-36 sm:h-48 bg-gradient-to-t from-amber-500 to-amber-300 text-purple-950 rounded-t-2xl shadow-2xl flex flex-col items-center justify-start pt-4 border-t-4 border-yellow-100">
+                        <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-purple-950 text-amber-300 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-lg">1</div>
+                        <span class="text-xs sm:text-sm font-black mt-1 uppercase">總冠軍</span>
+                    </div>
+                </div>
+
+                <!-- 季軍 (3rd) -->
+                <div id="podium-3" class="flex flex-col items-center">
+                    <div class="text-center mb-2">
+                        <div id="podium3-name" class="font-black text-sm sm:text-lg truncate max-w-[110px] sm:max-w-[160px]">---</div>
+                        <div id="podium3-score" class="text-xs sm:text-sm text-purple-200 font-bold">0 分</div>
+                    </div>
+                    <div class="w-full h-20 sm:h-28 bg-gradient-to-t from-amber-800 to-amber-600 text-white rounded-t-2xl shadow-xl flex flex-col items-center justify-start pt-2.5 border-t-4 border-amber-400">
+                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-amber-950 text-amber-200 flex items-center justify-center font-black text-base sm:text-lg shadow">3</div>
+                        <span class="text-xs font-black mt-1 uppercase opacity-80">季軍</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全班完整成績單 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-5 sm:p-6 shadow-2xl border-b-8 border-gray-300">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b pb-3">
+                    <h3 class="text-xl font-black flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-list text-purple-700"></i>
+                        <span>全班總成績表</span>
+                    </h3>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="exportScoresCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-file-csv"></i> 匯出 CSV 成績
+                        </button>
+                        <button id="hostPlayAgainBtn" onclick="hostRestartLobby()" class="hidden bg-purple-700 hover:bg-purple-600 text-white font-bold px-4 py-2 rounded-xl text-sm items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-rotate-right"></i> 原房再玩一局
+                        </button>
+                        <button onclick="confirmReturnHome()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold px-4 py-2 rounded-xl text-sm transition">
+                            返回主頁
+                        </button>
+                    </div>
+                </div>
+
+                <div id="finalScoreTable" class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    <!-- 動態生成全班最終名次 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 8: 單人自學模式總結與錯題溫習冊 (SOLO SUMMARY) ==================== -->
+        <section id="view-solo-summary" class="hidden w-full max-w-4xl animate-pop">
+            <div class="text-center mb-6">
+                <span class="bg-amber-400 text-purple-950 font-black px-4 py-1 rounded-full text-sm shadow">
+                    單人自學練習完成！
+                </span>
+                <h2 class="text-3xl sm:text-5xl font-black mt-2 drop-shadow">
+                    <i class="fa-solid fa-award text-amber-300 mr-2"></i>個人學習總結報告
+                </h2>
+                <div id="soloStarsRow" class="text-3xl sm:text-4xl text-amber-300 mt-2 space-x-1">
+                    <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                </div>
+            </div>
+
+            <!-- 數據統計四宮格 -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <div class="bg-white/15 backdrop-blur-md border border-white/20 rounded-3xl p-4 text-center">
+                    <div class="text-xs text-purple-200 font-bold">總得分</div>
+                    <div id="soloSummaryScore" class="text-2xl sm:text-3xl font-black text-amber-300 mt-1">0</div>
+                </div>
+                <div class="bg-white/15 backdrop-blur-md border border-white/20 rounded-3xl p-4 text-center">
+                    <div class="text-xs text-purple-200 font-bold">答對題數 / 準確率</div>
+                    <div id="soloSummaryAccuracy" class="text-2xl sm:text-3xl font-black text-emerald-300 mt-1">0/10 (0%)</div>
+                </div>
+                <div class="bg-white/15 backdrop-blur-md border border-white/20 rounded-3xl p-4 text-center">
+                    <div class="text-xs text-purple-200 font-bold">平均作答時間</div>
+                    <div id="soloSummaryAvgTime" class="text-2xl sm:text-3xl font-black text-white mt-1">0.0 秒</div>
+                </div>
+                <div class="bg-white/15 backdrop-blur-md border border-white/20 rounded-3xl p-4 text-center">
+                    <div class="text-xs text-purple-200 font-bold">最高連勝紀錄</div>
+                    <div id="soloSummaryMaxStreak" class="text-2xl sm:text-3xl font-black text-orange-300 mt-1">0 連勝</div>
+                </div>
+            </div>
+
+            <!-- 溫習冊與操作按鈕 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-5 sm:p-6 shadow-2xl border-b-8 border-gray-300">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b pb-3">
+                    <div>
+                        <h3 class="text-xl font-black flex items-center gap-2">
+                            <i class="fa-solid fa-book-open text-purple-700"></i>
+                            <span>錯題溫習冊與全題目詳解回顧</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-0.5">仔細閱讀通分與約分步驟，徹底掌握小五分數重點！</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="soloRetryWrongBtn" onclick="startSoloRetryWrong()" class="hidden bg-rose-600 hover:bg-rose-500 text-white font-black px-4 py-2.5 rounded-xl text-sm flex items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-rotate-left"></i> 只重練錯題 (<span id="soloWrongCountText">0</span>題)
+                        </button>
+                        <button type="button" onclick="openSetupModal('solo')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2.5 rounded-xl text-sm flex items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-redo"></i> 再練一局
+                        </button>
+                        <button type="button" onclick="cleanupAndGoHome()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-black px-4 py-2.5 rounded-xl text-sm transition">
+                            返回主頁
+                        </button>
+                    </div>
+                </div>
+
+                <div id="soloReviewList" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                    <!-- 動態生成每題作答紀錄與詳解 -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 底部版權與提示列 -->
+    <footer class="relative z-10 text-center py-3 text-xs text-purple-200/70">
+        LTMPS Kahoot! · 香港小學五年級數學科互動競賽系統
+    </footer>
+
+    <!-- 自訂彈出提示框 (取代原生 alert / confirm) -->
+    <div id="customModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white text-gray-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border-b-8 border-gray-300 animate-pop text-center">
+            <div id="modalIcon" class="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-3">
+                <i class="fa-solid fa-circle-exclamation"></i>
+            </div>
+            <h3 id="modalTitle" class="text-xl font-black mb-2">提示</h3>
+            <p id="modalMessage" class="text-gray-600 text-sm mb-6">訊息內容</p>
+            <div id="modalButtons" class="flex gap-3 justify-center">
+                <button id="modalCancelBtn" class="hidden flex-1 py-3 rounded-xl font-black bg-gray-100 hover:bg-gray-200 text-gray-700">取消</button>
+                <button id="modalConfirmBtn" class="flex-1 py-3 rounded-xl font-black bg-purple-700 hover:bg-purple-600 text-white">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**************************************************************
+         * 1. FIREBASE REALTIME DATABASE 初始化與全域狀態設定
+         **************************************************************/
+        const firebaseConfig = {
+            apiKey: "AIzaSyCHhCL8P5ICByjhZ60sBjlblbotgfYYL6s",
+            authDomain: "p6-equations.firebaseapp.com",
+            databaseURL: "https://p6-equations-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "p6-equations",
+            storageBucket: "p6-equations.firebasestorage.app",
+            messagingSenderId: "590830924261",
+            appId: "1:590830924261:web:a12b0c32ea779ae873bf0c"
+        };
+
+        const ROOMS_PATH = 'ltmps_kahoot_p5_rooms';
+        let db = null;
+        let isFirebaseConnected = false;
+
+        try {
+            if (typeof firebase !== 'undefined') {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                db = firebase.database();
+
+                // 監聽連線狀態
+                db.ref('.info/connected').on('value', (snap) => {
+                    isFirebaseConnected = (snap.val() === true);
+                    const dot = document.getElementById('connDot');
+                    const txt = document.getElementById('connText');
+                    const badge = document.getElementById('connectionBadge');
+                    if (dot && txt && badge) {
+                        if (isFirebaseConnected) {
+                            dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+                            txt.textContent = '即時連線中';
+                            badge.className = 'flex items-center gap-1.5 text-xs bg-emerald-900/70 border border-emerald-400/40 px-2.5 py-1.5 rounded-full';
+                        } else {
+                            dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                            txt.textContent = '單機/重連中';
+                            badge.className = 'flex items-center gap-1.5 text-xs bg-amber-900/70 border border-amber-400/40 px-2.5 py-1.5 rounded-full';
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn('Firebase 初始化警告（單人自學模式仍可正常運作）:', err);
+        }
+
+        // 全域狀態管理
+        const state = {
+            role: null, // 'host' | 'student' | 'solo'
+            setupMode: 'host', // 'host' | 'solo'
+            roomPin: null,
+            playerId: null,
+            classNo: 1,
+            playerName: '',
+            soundEnabled: true,
+            setup: {
+                qCount: 10,
+                timeLimit: 30, // 0 代表無限時間 (單人自學專用)
+                qFormat: 'mixed'
+            },
+            roomRef: null,
+            roomData: null,
+            timerInterval: null,
+            hasSubmittedCurrentQ: false,
+            lastRenderedStatus: null,
+            lastRenderedQIndex: null,
+            // 單人自學模式專用狀態
+            solo: {
+                questions: [],
+                currentQIndex: 0,
+                questionStartTime: 0,
+                timeLimit: 30,
+                score: 0,
+                streak: 0,
+                maxStreak: 0,
+                correctCount: 0,
+                history: [] // { q, userAnswer, isCorrect, earned, timeSpentSec }
+            }
+        };
+
+        /**************************************************************
+         * 2. Web Audio API 合成音效引擎 (免外部音訊檔、零延遲)
+         **************************************************************/
+        let audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioCtx = new AudioContextClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        function playSfx(type) {
+            if (!state.soundEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+
+                const playNote = (freq, start, duration, wave = 'sine', gainVal = 0.12) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = wave;
+                    osc.frequency.setValueAtTime(freq, start);
+                    gain.gain.setValueAtTime(gainVal, start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(start);
+                    osc.stop(start + duration);
+                };
+
+                if (type === 'click') {
+                    playNote(520, now, 0.06, 'triangle', 0.1);
+                } else if (type === 'join') {
+                    playNote(440, now, 0.1, 'sine', 0.12);
+                    playNote(554.37, now + 0.08, 0.1, 'sine', 0.12);
+                    playNote(659.25, now + 0.16, 0.18, 'sine', 0.14);
+                } else if (type === 'start') {
+                    playNote(523.25, now, 0.12, 'triangle', 0.14);
+                    playNote(659.25, now + 0.1, 0.12, 'triangle', 0.14);
+                    playNote(783.99, now + 0.2, 0.22, 'triangle', 0.15);
+                } else if (type === 'tick') {
+                    playNote(800, now, 0.05, 'sine', 0.09);
+                } else if (type === 'correct') {
+                    playNote(523.25, now, 0.1, 'triangle', 0.15);
+                    playNote(659.25, now + 0.1, 0.1, 'triangle', 0.15);
+                    playNote(783.99, now + 0.2, 0.1, 'triangle', 0.15);
+                    playNote(1046.5, now + 0.3, 0.28, 'triangle', 0.18);
+                } else if (type === 'wrong') {
+                    playNote(300, now, 0.18, 'sawtooth', 0.1);
+                    playNote(220, now + 0.18, 0.3, 'sawtooth', 0.12);
+                } else if (type === 'podium') {
+                    [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5].forEach((f, idx) => {
+                        playNote(f, now + idx * 0.12, 0.18, 'triangle', 0.16);
+                    });
+                }
+            } catch (e) {}
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const text = document.getElementById('soundText');
+            if (state.soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-amber-300';
+                text.textContent = '音效開';
+                playSfx('click');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-gray-400';
+                text.textContent = '靜音';
+            }
+        }
+
+        /**************************************************************
+         * 3. 畫面導覽 (showView) 與自訂彈出視窗 (showModal)
+         **************************************************************/
+        const ALL_VIEWS = [
+            'view-home',
+            'view-host-setup',
+            'view-student-profile',
+            'view-lobby',
+            'view-question',
+            'view-leaderboard',
+            'view-podium',
+            'view-solo-summary'
+        ];
+
+        function showView(viewId) {
+            ALL_VIEWS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (id === viewId) el.classList.remove('hidden');
+                    else el.classList.add('hidden');
+                }
+            });
+
+            const leaveBtn = document.getElementById('leaveBtn');
+            if (leaveBtn) {
+                if (viewId === 'view-home' || viewId === 'view-host-setup' || viewId === 'view-student-profile') {
+                    leaveBtn.classList.add('hidden');
+                } else {
+                    leaveBtn.classList.remove('hidden');
+                }
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showModal(title, message, onConfirm = null, showCancel = false) {
+            const modal = document.getElementById('customModal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+
+            const cancelBtn = document.getElementById('modalCancelBtn');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+
+            if (showCancel) {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.onclick = () => {
+                    playSfx('click');
+                    modal.classList.add('hidden');
+                };
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
+
+            confirmBtn.onclick = () => {
+                playSfx('click');
+                modal.classList.add('hidden');
+                if (typeof onConfirm === 'function') onConfirm();
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        function confirmReturnHome() {
+            if (!state.role && document.getElementById('view-home') && !document.getElementById('view-home').classList.contains('hidden')) {
+                return;
+            }
+            if (state.role === 'host' || state.role === 'student' || state.role === 'solo') {
+                const msg = state.role === 'solo'
+                    ? '確定要結束目前的單人自學練習並返回主頁嗎？'
+                    : '確定要離開目前的比賽房間並返回主頁嗎？';
+                showModal('返回主頁', msg, () => cleanupAndGoHome(), true);
+            } else {
+                cleanupAndGoHome();
+            }
+        }
+
+        async function cleanupAndGoHome() {
+            clearInterval(state.timerInterval);
+            if (state.roomRef) {
+                state.roomRef.off();
+                state.roomRef = null;
+            }
+            try {
+                if (state.role === 'host' && state.roomPin && db) {
+                    await db.ref(`${ROOMS_PATH}/${state.roomPin}`).remove();
+                } else if (state.role === 'student' && state.roomPin && state.playerId && db) {
+                    await db.ref(`${ROOMS_PATH}/${state.roomPin}/players/${state.playerId}`).remove();
+                }
+            } catch (e) {}
+
+            state.role = null;
+            state.roomPin = null;
+            state.playerId = null;
+            state.roomData = null;
+            state.lastRenderedStatus = null;
+            state.lastRenderedQIndex = null;
+            showView('view-home');
+        }
+
+        /**************************************************************
+         * 4. 數學工具函數與直式分數 HTML 渲染器
+         **************************************************************/
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 將字串中的 a/b 或 ( ? )/b 等分數結構轉為直式分數 HTML
+        function formatMathHTML(str) {
+            const escaped = escapeHtml(str);
+            return escaped.replace(/(\(\s*\?\s*\)|\d+)\/(\(\s*\?\s*\)|\d+)/g, (match, num, den) => {
+                return `<span class="frac-box"><span class="frac-num">${num}</span><span class="frac-den">${den}</span></span>`;
+            });
+        }
+
+        function normalizeAnswerStr(str) {
+            return String(str).replace(/\s+/g, '').trim();
+        }
+
+        function gcd(a, b) {
+            a = Math.abs(a);
+            b = Math.abs(b);
+            while (b > 0) {
+                const t = b;
+                b = a % b;
+                a = t;
+            }
+            return a || 1;
+        }
+
+        function lcm(a, b) {
+            return Math.abs(a * b) / gcd(a, b);
+        }
+
+        function simplifyFraction(num, den) {
+            const g = gcd(num, den);
+            return {
+                n: num / g,
+                d: den / g,
+                g: g
+            };
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function shuffleArray(arr) {
+            const copy = [...arr];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
+
+        // 組裝整數答案的 4 個不重複選項
+        function buildIntegerTrapOptions(correctVal, preferredTraps) {
+            const correctStr = String(correctVal);
+            const chosen = new Set([correctStr]);
+
+            for (const t of preferredTraps) {
+                if (chosen.size >= 4) break;
+                const num = Math.round(Number(t));
+                if (num > 0 && String(num) !== correctStr) {
+                    chosen.add(String(num));
+                }
+            }
+
+            const offsets = [-2, 2, -1, 1, -3, 3, -4, 4, 6, -6, 8, 10, -5, 5];
+            for (const off of shuffleArray(offsets)) {
+                if (chosen.size >= 4) break;
+                const cand = Number(correctVal) + off;
+                if (cand > 0 && String(cand) !== correctStr) {
+                    chosen.add(String(cand));
+                }
+            }
+
+            let fallback = 2;
+            while (chosen.size < 4) {
+                if (String(fallback) !== correctStr) chosen.add(String(fallback));
+                fallback++;
+            }
+
+            return shuffleArray(Array.from(chosen));
+        }
+
+        // 組裝分數答案的 4 個不重複選項 (允許放入「未約簡分數」作為高誘導性陷阱！)
+        function buildFractionTrapOptions(correctN, correctD, preferredFracStrs) {
+            const correctStr = `${correctN}/${correctD}`;
+            const chosen = new Set([correctStr]);
+
+            for (const fStr of preferredFracStrs) {
+                if (chosen.size >= 4) break;
+                if (!fStr || typeof fStr !== 'string') continue;
+                const parts = fStr.split('/');
+                if (parts.length !== 2) continue;
+                const tn = parseInt(parts[0], 10);
+                const td = parseInt(parts[1], 10);
+                if (tn > 0 && td > 1 && `${tn}/${td}` !== correctStr) {
+                    chosen.add(`${tn}/${td}`);
+                }
+            }
+
+            // 備用微調分子或分母的誘答
+            const backupCandidates = [
+                `${correctN + 1}/${correctD}`,
+                `${Math.max(1, correctN - 1)}/${correctD}`,
+                `${correctN + 2}/${correctD}`,
+                `${correctN * 2}/${correctD * 2}`,
+                `${correctD}/${correctN}`,
+                `${correctN}/${correctD + 2}`
+            ];
+
+            for (const cand of backupCandidates) {
+                if (chosen.size >= 4) break;
+                const [tn, td] = cand.split('/').map(Number);
+                if (tn > 0 && td > 1 && cand !== correctStr) {
+                    chosen.add(cand);
+                }
+            }
+
+            let step = 1;
+            while (chosen.size < 4) {
+                const cand = `${correctN + step}/${correctD + step}`;
+                if (cand !== correctStr) chosen.add(cand);
+                step++;
+            }
+
+            return shuffleArray(Array.from(chosen));
+        }
+
+        function resolveFormat(canBeFill, preferredMode) {
+            if (!canBeFill) return 'mc';
+            if (preferredMode === 'mc') return 'mc';
+            if (preferredMode === 'fill') return 'fill';
+            return Math.random() < 0.45 ? 'fill' : 'mc';
+        }
+
+        // 隨機產生一組互質的真分數或假分數
+        function pickCoprimeFraction(improper = false, maxDen = 12) {
+            for (let attempt = 0; attempt < 60; attempt++) {
+                const d = randInt(2, maxDen);
+                const n = improper ? randInt(d + 1, d * 2 + 3) : randInt(1, d - 1);
+                if (gcd(n, d) === 1) {
+                    return { n, d };
+                }
+            }
+            return improper ? { n: 7, d: 4 } : { n: 3, d: 4 };
+        }
+
+        /**************************************************************
+         * 5. 小五數學題庫生成器
+         *    單元 1：擴分/約分 (Types 1 - 6)
+         *    單元 2：異分母分數加減 (Types 7 - 12，須以最簡分數/最簡假分數作答)
+         **************************************************************/
+        function generateSingleQuestion(typeId, preferredMode) {
+            switch (typeId) {
+                // ==================== 單元 1：擴分/約分 ====================
+                // 題型 1: 真分數擴分求未知分子或分母
+                case 1: {
+                    const { n, d } = pickCoprimeFraction(false, 12);
+                    const k = randInt(2, 8);
+                    const expN = n * k;
+                    const expD = d * k;
+                    const askNumerator = Math.random() < 0.5;
+                    const qFormat = resolveFormat(true, preferredMode);
+
+                    if (askNumerator) {
+                        const ans = expN;
+                        // 經典錯誤：分子加上分母相差值 n + (expD - d)
+                        const addTrap = n + (expD - d);
+                        const traps = [addTrap, n * (k - 1), n * (k + 1), d * k, ans + 2];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `擴分計算：${n}/${d} = ( ? )/${expD}，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分母由 ${d} 擴分成為 ${expD}（乘以 ${k}），分子也要乘以 ${k}：${n} × ${k} = ${ans}，即 ${expN}/${expD}。`
+                        };
+                    } else {
+                        const ans = expD;
+                        const addTrap = d + (expN - n);
+                        const traps = [addTrap, d * (k - 1), d * (k + 1), n * k, ans + 2];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `擴分計算：${n}/${d} = ${expN}/( ? )，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分子由 ${n} 擴分成為 ${expN}（乘以 ${k}），分母也要乘以 ${k}：${d} × ${k} = ${ans}，即 ${expN}/${expD}。`
+                        };
+                    }
+                }
+
+                // 題型 2: 假分數擴分求未知分子或分母
+                case 2: {
+                    const { n, d } = pickCoprimeFraction(true, 10);
+                    const k = randInt(2, 7);
+                    const expN = n * k;
+                    const expD = d * k;
+                    const askNumerator = Math.random() < 0.5;
+                    const qFormat = resolveFormat(true, preferredMode);
+
+                    if (askNumerator) {
+                        const ans = expN;
+                        const addTrap = n + (expD - d);
+                        const traps = [addTrap, n * (k - 1), n * (k + 1), (n - d) * k];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `假分數擴分：${n}/${d} = ( ? )/${expD}，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分母乘以 ${k}（${d} × ${k} = ${expD}），分子同時乘以 ${k}：${n} × ${k} = ${ans}。`
+                        };
+                    } else {
+                        const ans = expD;
+                        const addTrap = d + (expN - n);
+                        const traps = [addTrap, d * (k - 1), d * (k + 1), expN - d];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `假分數擴分：${n}/${d} = ${expN}/( ? )，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分子乘以 ${k}（${n} × ${k} = ${expN}），分母同時乘以 ${k}：${d} × ${k} = ${ans}。`
+                        };
+                    }
+                }
+
+                // 題型 3: 約分求未知分子或分母
+                case 3: {
+                    const improper = Math.random() < 0.4;
+                    const { n, d } = pickCoprimeFraction(improper, 11);
+                    const k = randInt(2, 8);
+                    const origN = n * k;
+                    const origD = d * k;
+                    const askNumerator = Math.random() < 0.5;
+                    const qFormat = resolveFormat(true, preferredMode);
+
+                    if (askNumerator) {
+                        const ans = n;
+                        const traps = [k, ans + 1, Math.max(1, ans - 1), ans * 2, Math.max(1, origN - (origD - d))];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `約分計算：${origN}/${origD} = ( ? )/${d}，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分母由 ${origD} 約分成為 ${d}（除以 ${k}），分子也要除以 ${k}：${origN} ÷ ${k} = ${ans}。`
+                        };
+                    } else {
+                        const ans = d;
+                        const traps = [k, ans + 1, Math.max(2, ans - 1), ans * 2, Math.max(2, origD - (origN - n))];
+                        const options = qFormat === 'mc' ? buildIntegerTrapOptions(ans, traps) : [];
+                        return {
+                            topic: '擴分/約分',
+                            format: qFormat,
+                            prompt: `約分計算：${origN}/${origD} = ${n}/( ? )，括號內應填上甚麼數字？`,
+                            answer: String(ans),
+                            options,
+                            explanation: `分子由 ${origN} 約分成為 ${n}（除以 ${k}），分母也要除以 ${k}：${origD} ÷ ${k} = ${ans}。`
+                        };
+                    }
+                }
+
+                // 題型 4: 把真分數約至「最簡分數」
+                case 4: {
+                    const { n, d } = pickCoprimeFraction(false, 12);
+                    // 優先挑選合成數倍數 (如 4, 6, 8, 9, 10, 12)，製造「只約了一半」的高誘導性陷阱
+                    const k = pickRandom([3, 4, 4, 5, 6, 6, 8, 9, 10, 12]);
+                    const origN = n * k;
+                    const origD = d * k;
+                    const ansStr = `${n}/${d}`;
+                    const qFormat = resolveFormat(true, preferredMode);
+
+                    const partialTraps = [];
+                    for (let f = 2; f < k; f++) {
+                        if (k % f === 0) {
+                            partialTraps.push(`${(n * k) / f}/${(d * k) / f}`);
+                        }
+                    }
+                    const traps = [
+                        ...partialTraps,
+                        `${n + 1}/${d}`,
+                        `${n}/${d + 1}`,
+                        `${d}/${n > 1 ? n : d + 1}`
+                    ];
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(n, d, traps) : [];
+                    return {
+                        topic: '擴分/約分',
+                        format: qFormat,
+                        prompt: `把 ${origN}/${origD} 約至最簡分數。（請以最簡分數作答）`,
+                        answer: ansStr,
+                        options,
+                        explanation: `${origN} 和 ${origD} 的最大公因數是 ${k}，分子和分母同時除以 ${k}，得最簡分數 ${n}/${d}。`
+                    };
+                }
+
+                // 題型 5: 把假分數約至「最簡假分數」
+                case 5: {
+                    const { n, d } = pickCoprimeFraction(true, 10);
+                    const k = pickRandom([2, 3, 4, 4, 5, 6, 6, 8]);
+                    const origN = n * k;
+                    const origD = d * k;
+                    const ansStr = `${n}/${d}`;
+                    const qFormat = resolveFormat(true, preferredMode);
+
+                    const partialTraps = [];
+                    for (let f = 2; f < k; f++) {
+                        if (k % f === 0) {
+                            partialTraps.push(`${(n * k) / f}/${(d * k) / f}`);
+                        }
+                    }
+                    // 學生常見錯誤：只寫真分數部分 (n % d)/d、未完全約簡、分子分母顛倒 d/n
+                    const rem = n % d;
+                    const traps = [
+                        ...partialTraps,
+                        `${rem}/${d}`,
+                        `${d}/${n}`,
+                        `${n + 1}/${d}`,
+                        `${Math.max(d + 1, n - 1)}/${d}`
+                    ];
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(n, d, traps) : [];
+                    return {
+                        topic: '擴分/約分',
+                        format: qFormat,
+                        prompt: `把假分數 ${origN}/${origD} 約至最簡假分數。（請以最簡假分數作答）`,
+                        answer: ansStr,
+                        options,
+                        explanation: `${origN} 和 ${origD} 的最大公因數是 ${k}，分子和分母同時除以 ${k}，得最簡假分數 ${n}/${d}。`
+                    };
+                }
+
+                // 題型 6: 等值分數與最簡分數判斷 (選擇題)
+                case 6: {
+                    if (Math.random() < 0.5) {
+                        const improper = Math.random() < 0.35;
+                        const { n, d } = pickCoprimeFraction(improper, 10);
+                        const k = randInt(2, 6);
+                        const ansN = n * k;
+                        const ansD = d * k;
+                        // 經典迷思：分子分母同加一個數 (n+k)/(d+k)
+                        const traps = [
+                            `${n + k}/${d + k}`,
+                            `${n * k}/${d * (k + 1)}`,
+                            `${n * (k + 1)}/${d * k}`,
+                            `${d * k}/${n * k}`
+                        ];
+                        const options = buildFractionTrapOptions(ansN, ansD, traps);
+                        return {
+                            topic: '擴分/約分',
+                            format: 'mc',
+                            prompt: `以下哪一個分數與 ${n}/${d} 是等值分數（相等的分數）？`,
+                            answer: `${ansN}/${ansD}`,
+                            options,
+                            explanation: `將 ${n}/${d} 的分子和分母同時乘以 ${k}，可得等值分數 ${ansN}/${ansD}（注意：分子和分母同加一個數不會得到等值分數！）。`
+                        };
+                    } else {
+                        const improper = Math.random() < 0.4;
+                        const { n, d } = pickCoprimeFraction(improper, 12);
+                        // 容易誤以為是最簡分數的奇數/合成數陷阱
+                        const reduciblePool = [
+                            '9/15', '14/21', '15/25', '18/24', '21/14',
+                            '27/18', '12/16', '20/15', '26/39', '33/22', '16/24', '25/15'
+                        ];
+                        const pickedTraps = shuffleArray(reduciblePool).slice(0, 3);
+                        const options = buildFractionTrapOptions(n, d, pickedTraps);
+                        return {
+                            topic: '擴分/約分',
+                            format: 'mc',
+                            prompt: `以下哪一個分數已經是「最簡分數」（或最簡假分數）？`,
+                            answer: `${n}/${d}`,
+                            options,
+                            explanation: `${n} 和 ${d} 的最大公因數是 1（互質），不能再約分，所以 ${n}/${d} 是最簡分數。`
+                        };
+                    }
+                }
+
+                // ==================== 單元 2：異分母分數加減 ====================
+                // 題型 7: 異分母真分數加法（結果 < 1，以最簡分數作答）
+                case 7: {
+                    const denPairs = [
+                        [2, 3], [2, 5], [3, 4], [3, 5], [4, 5], [2, 7], [3, 7],
+                        [4, 6], [6, 8], [6, 9], [8, 12], [6, 10], [4, 12], [3, 6], [4, 8]
+                    ];
+                    let d1, d2, n1, n2, L, rawN, simp;
+                    for (let attempt = 0; attempt < 50; attempt++) {
+                        [d1, d2] = shuffleArray(pickRandom(denPairs));
+                        n1 = randInt(1, d1 - 1);
+                        n2 = randInt(1, d2 - 1);
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1) continue;
+                        L = lcm(d1, d2);
+                        rawN = n1 * (L / d1) + n2 * (L / d2);
+                        if (rawN < L) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+                    if (!simp || rawN >= L) {
+                        d1 = 4; d2 = 12; n1 = 1; n2 = 5; L = 12; rawN = 8;
+                        simp = simplifyFraction(8, 12); // 2/3
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`); // 未約簡陷阱
+                    traps.push(`${n1 + n2}/${d1 + d2}`); // 分子分母直接相加陷阱
+                    traps.push(`${n1 + n2}/${L}`); // 忘記擴分分子陷阱
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再除以最大公因數 ${simp.g} 約簡得 ${simp.n}/${simp.d}` : '';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: `計算：${n1}/${d1} + ${n2}/${d2} = _____（以最簡分數作答）`,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `先通分（最小公倍數是 ${L}）：${n1 * (L / d1)}/${L} + ${n2 * (L / d2)}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+
+                // 題型 8: 異分母分數加法（結果 > 1，須以最簡假分數作答）
+                case 8: {
+                    const denPairs = [
+                        [2, 3], [3, 4], [4, 5], [4, 6], [6, 8], [6, 9], [8, 12],
+                        [6, 10], [3, 6], [4, 8], [5, 10], [3, 9], [4, 10]
+                    ];
+                    let d1, d2, n1, n2, L, rawN, simp;
+                    for (let attempt = 0; attempt < 60; attempt++) {
+                        [d1, d2] = shuffleArray(pickRandom(denPairs));
+                        n1 = randInt(Math.max(1, Math.floor(d1 / 2)), d1 + 2);
+                        n2 = randInt(Math.max(1, Math.floor(d2 / 2)), d2 - 1);
+                        if (n1 === d1) n1++;
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1) continue;
+                        L = lcm(d1, d2);
+                        rawN = n1 * (L / d1) + n2 * (L / d2);
+                        if (rawN > L && rawN % L !== 0) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+                    if (!simp || rawN <= L || rawN % L === 0) {
+                        d1 = 6; d2 = 10; n1 = 5; n2 = 7; L = 30; rawN = 46;
+                        simp = simplifyFraction(46, 30); // 23/15
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`); // 未約簡假分數陷阱
+                    traps.push(`${simp.n % simp.d}/${simp.d}`); // 漏寫整數部分只寫真分數陷阱
+                    traps.push(`${n1 + n2}/${d1 + d2}`); // 分子分母直接相加陷阱
+                    traps.push(`${simp.d}/${simp.n}`); // 分子分母顛倒陷阱
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再約分（上下同除以 ${simp.g}）得最簡假分數 ${simp.n}/${simp.d}` : '';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: `計算：${n1}/${d1} + ${n2}/${d2} = _____（以最簡假分數作答）`,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `先通分（最小公倍數是 ${L}）：${n1 * (L / d1)}/${L} + ${n2 * (L / d2)}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+
+                // 題型 9: 異分母真分數減法（以最簡分數作答）
+                case 9: {
+                    const denPairs = [
+                        [2, 3], [3, 4], [2, 5], [3, 5], [4, 5], [4, 6], [6, 8],
+                        [6, 9], [8, 12], [6, 10], [4, 12], [5, 10], [6, 12]
+                    ];
+                    let d1, d2, n1, n2, L, rawN, simp;
+                    for (let attempt = 0; attempt < 60; attempt++) {
+                        [d1, d2] = shuffleArray(pickRandom(denPairs));
+                        n1 = randInt(1, d1 - 1);
+                        n2 = randInt(1, d2 - 1);
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1) continue;
+                        L = lcm(d1, d2);
+                        rawN = n1 * (L / d1) - n2 * (L / d2);
+                        if (rawN > 0) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+                    if (!simp || rawN <= 0) {
+                        d1 = 6; d2 = 10; n1 = 5; n2 = 1; L = 30; rawN = 22;
+                        simp = simplifyFraction(22, 30); // 11/15
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`); // 未約簡陷阱
+                    if (Math.abs(d1 - d2) > 1 && Math.abs(n1 - n2) > 0) {
+                        traps.push(`${Math.abs(n1 - n2)}/${Math.abs(d1 - d2)}`); // 直接相減陷阱
+                    }
+                    const sumSimp = simplifyFraction(n1 * (L / d1) + n2 * (L / d2), L);
+                    traps.push(`${sumSimp.n}/${sumSimp.d}`); // 誤作加法陷阱
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再除以 ${simp.g} 約簡得 ${simp.n}/${simp.d}` : '';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: `計算：${n1}/${d1} − ${n2}/${d2} = _____（以最簡分數作答）`,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `先通分（最小公倍數是 ${L}）：${n1 * (L / d1)}/${L} − ${n2 * (L / d2)}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+
+                // 題型 10: 異分母假分數減法（結果為最簡假分數或最簡真分數）
+                case 10: {
+                    const denPairs = [
+                        [2, 3], [3, 4], [4, 6], [6, 8], [3, 6], [4, 8], [6, 9], [4, 12], [5, 10]
+                    ];
+                    let d1, d2, n1, n2, L, rawN, simp;
+                    for (let attempt = 0; attempt < 60; attempt++) {
+                        [d1, d2] = shuffleArray(pickRandom(denPairs));
+                        n1 = randInt(d1 + 1, d1 * 2 + 1); // 假分數
+                        n2 = randInt(1, d2 - 1);
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1) continue;
+                        L = lcm(d1, d2);
+                        rawN = n1 * (L / d1) - n2 * (L / d2);
+                        if (rawN > 0 && rawN % L !== 0) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+                    if (!simp || rawN <= 0 || rawN % L === 0) {
+                        d1 = 6; d2 = 2; n1 = 11; n2 = 1; L = 6; rawN = 8;
+                        simp = simplifyFraction(8, 6); // 4/3
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`);
+                    if (simp.n > simp.d) traps.push(`${simp.n - simp.d}/${simp.d}`);
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+                    traps.push(`${Math.max(1, simp.n - 1)}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再除以 ${simp.g} 約簡得 ${simp.n}/${simp.d}` : '';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: `計算：${n1}/${d1} − ${n2}/${d2} = _____（以最簡分數或最簡假分數作答）`,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `先通分（最小公倍數是 ${L}）：${n1 * (L / d1)}/${L} − ${n2 * (L / d2)}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+
+                // 題型 11: 三個異分母分數加減混合計算
+                case 11: {
+                    const triplets = [
+                        [2, 3, 4], [2, 3, 6], [2, 4, 8], [3, 4, 6],
+                        [2, 5, 10], [3, 5, 15], [4, 6, 12], [3, 4, 12]
+                    ];
+                    let d1, d2, d3, n1, n2, n3, op1, op2, L, e1, e2, e3, rawN, simp;
+
+                    for (let attempt = 0; attempt < 60; attempt++) {
+                        [d1, d2, d3] = shuffleArray(pickRandom(triplets));
+                        n1 = randInt(1, d1 - 1);
+                        n2 = randInt(1, d2 - 1);
+                        n3 = randInt(1, d3 - 1);
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1 || gcd(n3, d3) !== 1) continue;
+
+                        L = lcm(lcm(d1, d2), d3);
+                        e1 = n1 * (L / d1);
+                        e2 = n2 * (L / d2);
+                        e3 = n3 * (L / d3);
+
+                        const mode = randInt(1, 3);
+                        if (mode === 1) {
+                            op1 = '+'; op2 = '+';
+                            rawN = e1 + e2 + e3;
+                        } else if (mode === 2) {
+                            op1 = '+'; op2 = '−';
+                            rawN = e1 + e2 - e3;
+                        } else {
+                            if (e1 <= e2) continue; // 確保第一步夠減
+                            op1 = '−'; op2 = '+';
+                            rawN = e1 - e2 + e3;
+                        }
+
+                        if (rawN > 0 && rawN % L !== 0) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+
+                    if (!simp || rawN <= 0 || rawN % L === 0) {
+                        d1 = 4; d2 = 6; d3 = 3; n1 = 3; n2 = 5; n3 = 1;
+                        op1 = '+'; op2 = '−'; L = 12; e1 = 9; e2 = 10; e3 = 4; rawN = 15;
+                        simp = simplifyFraction(15, 12); // 5/4
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`);
+                    if (simp.n > simp.d) traps.push(`${simp.n - simp.d}/${simp.d}`);
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+                    traps.push(`${Math.max(1, simp.n - 1)}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再約分得 ${simp.n}/${simp.d}` : '';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: `計算：${n1}/${d1} ${op1} ${n2}/${d2} ${op2} ${n3}/${d3} = _____（以最簡分數或最簡假分數作答）`,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `通分（公分母是 ${L}）：${e1}/${L} ${op1} ${e2}/${L} ${op2} ${e3}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+
+                // 題型 12: 異分母分數加減文字應用題
+                case 12: {
+                    const isAddition = Math.random() < 0.55;
+                    const denPairs = [
+                        [2, 3], [3, 4], [4, 5], [4, 6], [6, 8], [6, 9], [8, 12], [6, 10], [3, 6], [4, 8]
+                    ];
+                    let d1, d2, n1, n2, L, rawN, simp;
+
+                    for (let attempt = 0; attempt < 60; attempt++) {
+                        [d1, d2] = shuffleArray(pickRandom(denPairs));
+                        n1 = isAddition ? randInt(1, d1 - 1) : randInt(2, d1 + 2);
+                        n2 = randInt(1, d2 - 1);
+                        if (n1 === d1) n1++;
+                        if (gcd(n1, d1) !== 1 || gcd(n2, d2) !== 1) continue;
+                        L = lcm(d1, d2);
+                        rawN = isAddition
+                            ? n1 * (L / d1) + n2 * (L / d2)
+                            : n1 * (L / d1) - n2 * (L / d2);
+                        if (rawN > 0 && rawN % L !== 0) {
+                            simp = simplifyFraction(rawN, L);
+                            if (simp.d > 1) break;
+                        }
+                    }
+
+                    if (!simp || rawN <= 0 || rawN % L === 0) {
+                        isAddition = true;
+                        d1 = 4; d2 = 6; n1 = 3; n2 = 5; L = 12; rawN = 19;
+                        simp = simplifyFraction(19, 12);
+                    }
+
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [];
+                    if (simp.g > 1) traps.push(`${rawN}/${L}`);
+                    if (simp.n > simp.d) traps.push(`${simp.n - simp.d}/${simp.d}`);
+                    traps.push(`${n1 + n2}/${d1 + d2}`);
+                    traps.push(`${simp.n + 1}/${simp.d}`);
+
+                    const options = qFormat === 'mc' ? buildFractionTrapOptions(simp.n, simp.d, traps) : [];
+                    const reduceNote = simp.g > 1 ? `，再約簡得 ${simp.n}/${simp.d}` : '';
+
+                    const addPrompts = [
+                        `水壺內原有果汁 ${n1}/${d1} 升，媽媽再注入 ${n2}/${d2} 升，現在水壺內共有果汁多少升？（以最簡分數或最簡假分數作答）`,
+                        `紅絲帶長 ${n1}/${d1} 米，藍絲帶比紅絲帶長 ${n2}/${d2} 米。藍絲帶長多少米？（以最簡分數或最簡假分數作答）`,
+                        `小欣上午喝了牛奶 ${n1}/${d1} 升，下午喝了 ${n2}/${d2} 升，她全日共喝了牛奶多少升？（以最簡分數或最簡假分數作答）`
+                    ];
+                    const subPrompts = [
+                        `一袋麵粉重 ${n1}/${d1} 公斤，做蛋糕用去了 ${n2}/${d2} 公斤，還餘麵粉多少公斤？（以最簡分數或最簡假分數作答）`,
+                        `小軒練習跑步，昨天跑了 ${n1}/${d1} 公里，今天比昨天少跑了 ${n2}/${d2} 公里。小軒今天跑了多少公里？（以最簡分數或最簡假分數作答）`,
+                        `繩子原本長 ${n1}/${d1} 米，剪去 ${n2}/${d2} 米後，還餘下繩子多少米？（以最簡分數或最簡假分數作答）`
+                    ];
+
+                    const promptText = isAddition ? pickRandom(addPrompts) : pickRandom(subPrompts);
+                    const opSymbol = isAddition ? '+' : '−';
+
+                    return {
+                        topic: '異分母分數加減',
+                        format: qFormat,
+                        prompt: promptText,
+                        answer: `${simp.n}/${simp.d}`,
+                        options,
+                        explanation: `列式：${n1}/${d1} ${opSymbol} ${n2}/${d2} = ${n1 * (L / d1)}/${L} ${opSymbol} ${n2 * (L / d2)}/${L} = ${rawN}/${L}${reduceNote}。`
+                    };
+                }
+            }
+        }
+
+        function generateQuestionDeck(count, topics, preferredMode) {
+            const allowedTypes = [];
+            if (topics.expandReduce) allowedTypes.push(1, 2, 3, 4, 5, 6);
+            if (topics.fractionAddSub) allowedTypes.push(7, 8, 9, 10, 11, 12);
+
+            const questions = [];
+            let typeBag = [];
+            for (let i = 0; i < count; i++) {
+                if (typeBag.length === 0) {
+                    typeBag = shuffleArray(allowedTypes);
+                }
+                const chosenType = typeBag.pop();
+                questions.push(generateSingleQuestion(chosenType, preferredMode));
+            }
+            return questions;
+        }
+
+        /**************************************************************
+         * 6. 老師端設定 / 學生單人自學設定與啟動流程
+         **************************************************************/
+        function openSetupModal(mode) {
+            playSfx('click');
+            state.setupMode = mode; // 'host' | 'solo'
+
+            const headerIcon = document.getElementById('setupHeaderIcon');
+            const headerTitle = document.getElementById('setupHeaderTitle');
+            const headerSub = document.getElementById('setupHeaderSub');
+            const primaryBtn = document.getElementById('createRoomSubmitBtn');
+            const primaryBtnText = document.getElementById('setupPrimaryBtnText');
+            const unlimitedBtn = document.getElementById('unlimitedTimeBtn');
+            const host90Btn = document.getElementById('host90TimeBtn');
+
+            if (mode === 'solo') {
+                headerIcon.className = 'w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl font-black';
+                headerIcon.innerHTML = '<i class="fa-solid fa-user-graduate"></i>';
+                headerTitle.textContent = '單人自學模式設定';
+                headerSub.textContent = '自由挑選想溫習的小五分數單元、題數及作答時間，每題完成後即時查看算式詳解！';
+                primaryBtn.className = 'w-2/3 kahoot-green text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2';
+                primaryBtnText.textContent = '開始自學挑戰！';
+                unlimitedBtn.classList.remove('hidden');
+                host90Btn.classList.add('hidden');
+            } else {
+                headerIcon.className = 'w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl font-black';
+                headerIcon.innerHTML = '<i class="fa-solid fa-sliders"></i>';
+                headerTitle.textContent = '創建比賽房間設定';
+                headerSub.textContent = '系統將根據所選單元隨機生成高誘導性題目（答案須以最簡分數／最簡假分數作答）';
+                primaryBtn.className = 'w-2/3 btn-3d-purple text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2';
+                primaryBtnText.textContent = '立即開啟房間';
+                unlimitedBtn.classList.add('hidden');
+                host90Btn.classList.remove('hidden');
+                if (state.setup.timeLimit === 0) {
+                    selectOption('timeLimit', 30);
+                }
+            }
+
+            showView('view-host-setup');
+        }
+
+        function handleSetupPrimaryAction() {
+            if (state.setupMode === 'solo') {
+                handleStartSoloGame();
+            } else {
+                handleCreateRoom();
+            }
+        }
+
+        function toggleAllTopics(checked) {
+            playSfx('click');
+            [
+                'topic-expand-reduce',
+                'topic-fraction-add-sub'
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = checked;
+            });
+        }
+
+        function updatePresetButtonStyles(group, val) {
+            const selectorMap = {
+                qCount: '.qcount-btn',
+                timeLimit: '.time-btn',
+                qFormat: '.format-btn'
+            };
+            document.querySelectorAll(selectorMap[group]).forEach(btn => {
+                const btnVal = btn.getAttribute('data-val');
+                if (String(btnVal) === String(val)) {
+                    btn.className = btn.className
+                        .replace('border-gray-200 text-gray-700 hover:bg-gray-100', '')
+                        .replace('border-purple-600 bg-purple-600 text-white', '')
+                        .trim() + ' border-purple-600 bg-purple-600 text-white';
+                } else {
+                    btn.className = btn.className
+                        .replace('border-purple-600 bg-purple-600 text-white', '')
+                        .replace('border-gray-200 text-gray-700 hover:bg-gray-100', '')
+                        .trim() + ' border-gray-200 text-gray-700 hover:bg-gray-100';
+                }
+            });
+        }
+
+        function selectOption(group, val) {
+            playSfx('click');
+            state.setup[group] = val;
+
+            if (group === 'qCount') {
+                const input = document.getElementById('customQCountInput');
+                if (input) input.value = val;
+            } else if (group === 'timeLimit') {
+                const input = document.getElementById('customTimeLimitInput');
+                const unitLabel = document.getElementById('timeUnitLabel');
+                if (input) input.value = val;
+                if (unitLabel) unitLabel.textContent = (Number(val) === 0) ? '秒(無限)' : '秒';
+            }
+
+            updatePresetButtonStyles(group, val);
+        }
+
+        function handleCustomInput(group, rawVal) {
+            const num = parseInt(rawVal, 10);
+            if (!isNaN(num) && num >= 0) {
+                state.setup[group] = num;
+                if (group === 'timeLimit') {
+                    const unitLabel = document.getElementById('timeUnitLabel');
+                    if (unitLabel) unitLabel.textContent = (num === 0) ? '秒(無限)' : '秒';
+                }
+                updatePresetButtonStyles(group, num);
+            }
+        }
+
+        function getSelectedTopicsFromUI() {
+            return {
+                expandReduce: document.getElementById('topic-expand-reduce').checked,
+                fractionAddSub: document.getElementById('topic-fraction-add-sub').checked
+            };
+        }
+
+        function hasAnyTopicSelected(topics) {
+            return Object.values(topics).some(Boolean);
+        }
+
+        // ==================== 單人自學模式啟動與流程 ====================
+        function handleStartSoloGame(customQuestions = null) {
+            const topics = getSelectedTopicsFromUI();
+            if (!customQuestions && !hasAnyTopicSelected(topics)) {
+                showModal('請選擇單元', '請至少勾選一個要練習的五年級數學單元！');
+                return;
+            }
+
+            const customQ = parseInt(document.getElementById('customQCountInput').value, 10);
+            const customTime = parseInt(document.getElementById('customTimeLimitInput').value, 10);
+
+            if (!customQuestions && (isNaN(customQ) || customQ < 1 || customQ > 50)) {
+                showModal('題目數目設定錯誤', '請輸入 1 至 50 之間的題目數量！');
+                return;
+            }
+            if (isNaN(customTime) || (customTime !== 0 && (customTime < 5 || customTime > 300))) {
+                showModal('作答時間設定錯誤', '每題作答時間請設定在 5 至 300 秒之間（或輸入 0 代表無限時間）！');
+                return;
+            }
+
+            state.setup.qCount = customQ;
+            state.setup.timeLimit = customTime;
+
+            const deck = customQuestions || generateQuestionDeck(customQ, topics, state.setup.qFormat);
+
+            state.role = 'solo';
+            state.solo = {
+                questions: deck,
+                currentQIndex: 0,
+                questionStartTime: Date.now(),
+                timeLimit: customTime,
+                score: 0,
+                streak: 0,
+                maxStreak: 0,
+                correctCount: 0,
+                history: []
+            };
+
+            playSfx('start');
+            renderSoloQuestion();
+        }
+
+        function renderSoloQuestion() {
+            showView('view-question');
+            state.hasSubmittedCurrentQ = false;
+
+            const s = state.solo;
+            const qIndex = s.currentQIndex;
+            const totalQ = s.questions.length;
+            const q = s.questions[qIndex];
+            s.questionStartTime = Date.now();
+
+            document.getElementById('qProgressBadge').textContent = `自學 第 ${qIndex + 1} / ${totalQ} 題`;
+            document.getElementById('qTopicBadge').textContent = q.topic;
+            document.getElementById('questionText').innerHTML = formatMathHTML(q.prompt);
+
+            const studentHeader = document.getElementById('studentScoreHeader');
+            const hostControls = document.getElementById('hostQuestionControls');
+            studentHeader.classList.remove('hidden');
+            studentHeader.classList.add('flex');
+            hostControls.classList.add('hidden');
+            hostControls.classList.remove('flex');
+
+            document.getElementById('studentCurrentScore').textContent = s.score;
+            const streakBadge = document.getElementById('studentStreakBadge');
+            if (s.streak >= 2) {
+                streakBadge.classList.remove('hidden');
+                streakBadge.classList.add('flex');
+                document.getElementById('studentStreakCount').textContent = s.streak;
+            } else {
+                streakBadge.classList.add('hidden');
+            }
+
+            const mcArea = document.getElementById('mcAnswerArea');
+            const fillArea = document.getElementById('fillAnswerArea');
+            const waitBox = document.getElementById('studentSubmittedWait');
+            waitBox.classList.add('hidden');
+
+            if (q.format === 'mc') {
+                mcArea.classList.remove('hidden');
+                fillArea.classList.add('hidden');
+                q.options.forEach((optText, idx) => {
+                    document.getElementById(`mc-text-${idx}`).innerHTML = formatMathHTML(optText);
+                    const btn = document.getElementById(`mc-btn-${idx}`);
+                    btn.disabled = false;
+                    btn.classList.remove('cursor-default');
+                });
+            } else {
+                mcArea.classList.add('hidden');
+                fillArea.classList.remove('hidden');
+                document.getElementById('studentFillControls').classList.remove('hidden');
+                document.getElementById('hostFillNotice').classList.add('hidden');
+                const inputBox = document.getElementById('fillInputBox');
+                inputBox.value = '';
+                setTimeout(() => inputBox.focus(), 100);
+            }
+
+            // 計時器處理 (支援無限時間 timeLimit === 0)
+            clearInterval(state.timerInterval);
+            const timerCircle = document.getElementById('timerCircle');
+            const timerBar = document.getElementById('timerBar');
+            timerCircle.classList.remove('bg-rose-600');
+
+            if (s.timeLimit === 0) {
+                timerCircle.innerHTML = '<i class="fa-solid fa-infinity"></i>';
+                timerBar.style.width = '100%';
+                document.getElementById('questionSubHint').textContent = '無限時間模式：請以最簡分數或最簡假分數作答！';
+            } else {
+                document.getElementById('questionSubHint').textContent = '請以「最簡分數」或「最簡假分數」作答 · 愈快答對分數愈高！';
+                const timeLimitSec = s.timeLimit;
+                const startTime = s.questionStartTime;
+                let lastWholeSec = -1;
+
+                state.timerInterval = setInterval(() => {
+                    const elapsedSec = (Date.now() - startTime) / 1000;
+                    const remaining = Math.max(0, timeLimitSec - elapsedSec);
+                    const wholeSec = Math.ceil(remaining);
+
+                    timerCircle.textContent = wholeSec;
+                    const pct = Math.max(0, Math.min(100, (remaining / timeLimitSec) * 100));
+                    timerBar.style.width = `${pct}%`;
+
+                    if (wholeSec <= 5 && wholeSec > 0 && wholeSec !== lastWholeSec) {
+                        lastWholeSec = wholeSec;
+                        playSfx('tick');
+                        timerCircle.classList.add('bg-rose-600', 'scale-110');
+                        setTimeout(() => timerCircle.classList.remove('scale-110'), 150);
+                    }
+
+                    if (remaining <= 0) {
+                        clearInterval(state.timerInterval);
+                        evaluateSoloAnswer('（逾時未作答）', true);
+                    }
+                }, 100);
+            }
+        }
+
+        function evaluateSoloAnswer(answerStr, isTimeout = false) {
+            if (state.hasSubmittedCurrentQ) return;
+            state.hasSubmittedCurrentQ = true;
+            clearInterval(state.timerInterval);
+
+            const s = state.solo;
+            const q = s.questions[s.currentQIndex];
+            const cleanAns = isTimeout ? answerStr : normalizeAnswerStr(answerStr);
+            const isCorrect = !isTimeout && (cleanAns === normalizeAnswerStr(q.answer));
+            const elapsedMs = Math.max(0, Date.now() - s.questionStartTime);
+            const elapsedSec = Math.round((elapsedMs / 1000) * 10) / 10;
+
+            let earned = 0;
+            if (isCorrect) {
+                if (s.timeLimit === 0) {
+                    earned = 800;
+                } else {
+                    const ratio = Math.max(0, Math.min(1, 1 - (elapsedMs / (s.timeLimit * 1000))));
+                    earned = Math.round(500 + 500 * ratio);
+                }
+                s.score += earned;
+                s.streak += 1;
+                if (s.streak > s.maxStreak) s.maxStreak = s.streak;
+                s.correctCount += 1;
+                playSfx('correct');
+            } else {
+                s.streak = 0;
+                playSfx('wrong');
+            }
+
+            s.history.push({
+                q: q,
+                userAnswer: cleanAns,
+                isCorrect: isCorrect,
+                earned: earned,
+                timeSpentSec: elapsedSec
+            });
+
+            // 顯示單題結果與詳解畫面
+            showView('view-leaderboard');
+            document.getElementById('multiplayerLeaderboardCard').classList.add('hidden');
+            document.getElementById('soloNextActionCard').classList.remove('hidden');
+
+            document.getElementById('reviewTopicTag').textContent = `單元：${q.topic}`;
+            document.getElementById('reviewQuestionText').innerHTML = formatMathHTML(q.prompt);
+            document.getElementById('reviewCorrectAnswer').innerHTML = formatMathHTML(q.answer);
+            document.getElementById('reviewExplanation').innerHTML = formatMathHTML(`解說：${q.explanation}`);
+            document.getElementById('reviewStatsBadge').innerHTML = formatMathHTML(`你的作答：${cleanAns}（耗時 ${elapsedSec} 秒）`);
+
+            const feedbackBanner = document.getElementById('studentRoundFeedback');
+            feedbackBanner.classList.remove('hidden');
+
+            if (isCorrect) {
+                feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-emerald-600 border-emerald-800 text-white';
+                document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-check"></i>';
+                document.getElementById('feedbackTitle').textContent = s.streak >= 2 ? `答對了！（連中 ${s.streak} 題🔥）` : '答對了！太棒了！';
+                document.getElementById('feedbackSub').textContent = `你用了 ${elapsedSec} 秒答對這題！`;
+                document.getElementById('feedbackDelta').textContent = `+${earned}`;
+            } else {
+                feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-rose-600 border-rose-800 text-white';
+                document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                document.getElementById('feedbackTitle').textContent = isTimeout ? '時間到！未能及時作答' : '這題答錯了，看看下方詳解吧！';
+                document.getElementById('feedbackSub').innerHTML = formatMathHTML(`你的作答：${cleanAns} · 正確答案是：${q.answer}`);
+                document.getElementById('feedbackDelta').textContent = '+0';
+            }
+
+            const totalQ = s.questions.length;
+            const isLast = (s.currentQIndex + 1) >= totalQ;
+            document.getElementById('soloReviewProgressText').textContent = `目前累積：${s.score} 分（答對 ${s.correctCount} / ${s.currentQIndex + 1} 題）`;
+            document.getElementById('soloNextBtnText').textContent = isLast ? '查看學習總結報告' : '下一題';
+        }
+
+        function soloNextQuestion() {
+            playSfx('click');
+            const s = state.solo;
+            if (s.currentQIndex + 1 >= s.questions.length) {
+                renderSoloSummaryView();
+            } else {
+                s.currentQIndex += 1;
+                renderSoloQuestion();
+            }
+        }
+
+        function renderSoloSummaryView() {
+            showView('view-solo-summary');
+            playSfx('podium');
+            triggerConfetti();
+
+            const s = state.solo;
+            const totalQ = s.questions.length;
+            const acc = totalQ > 0 ? Math.round((s.correctCount / totalQ) * 100) : 0;
+            const totalTime = s.history.reduce((accT, item) => accT + item.timeSpentSec, 0);
+            const avgTime = totalQ > 0 ? (totalTime / totalQ).toFixed(1) : '0.0';
+
+            document.getElementById('soloSummaryScore').textContent = `${s.score} 分`;
+            document.getElementById('soloSummaryAccuracy').textContent = `${s.correctCount}/${totalQ} (${acc}%)`;
+            document.getElementById('soloSummaryAvgTime').textContent = `${avgTime} 秒`;
+            document.getElementById('soloSummaryMaxStreak').textContent = `${s.maxStreak} 連勝`;
+
+            // 星級評價
+            const starsEl = document.getElementById('soloStarsRow');
+            let starCount = 1;
+            if (acc >= 85) starCount = 3;
+            else if (acc >= 60) starCount = 2;
+            starsEl.innerHTML = Array.from({ length: 3 }, (_, i) =>
+                i < starCount
+                    ? '<i class="fa-solid fa-star text-amber-300 drop-shadow"></i>'
+                    : '<i class="fa-regular fa-star text-purple-300/40"></i>'
+            ).join('');
+
+            // 檢查是否有錯題可重練
+            const wrongItems = s.history.filter(item => !item.isCorrect);
+            const retryBtn = document.getElementById('soloRetryWrongBtn');
+            if (wrongItems.length > 0) {
+                retryBtn.classList.remove('hidden');
+                document.getElementById('soloWrongCountText').textContent = wrongItems.length;
+            } else {
+                retryBtn.classList.add('hidden');
+            }
+
+            // 渲染題目回顧列表
+            const listEl = document.getElementById('soloReviewList');
+            listEl.innerHTML = s.history.map((item, idx) => {
+                const badgeClass = item.isCorrect
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-100 text-rose-800 border-rose-300';
+                const statusIcon = item.isCorrect
+                    ? '<i class="fa-solid fa-circle-check text-emerald-600"></i> 答對'
+                    : '<i class="fa-solid fa-circle-xmark text-rose-600"></i> 答錯';
+
+                return `
+                    <div class="rounded-2xl p-4 border-2 ${badgeClass} transition">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-black text-xs bg-white/80 px-2.5 py-0.5 rounded-lg">第 ${idx + 1} 題 · ${escapeHtml(item.q.topic)}</span>
+                                <span class="font-black text-xs">${statusIcon}</span>
+                            </div>
+                            <span class="text-xs font-bold opacity-80">耗時 ${item.timeSpentSec} 秒 · +${item.earned} 分</span>
+                        </div>
+                        <div class="font-black text-base sm:text-lg text-gray-900 mb-2">${formatMathHTML(item.q.prompt)}</div>
+                        <div class="flex flex-wrap gap-3 text-xs sm:text-sm font-bold mb-2">
+                            <span class="bg-white/90 px-3 py-1 rounded-xl text-gray-800">你的答案：<strong class="${item.isCorrect ? 'text-emerald-700' : 'text-rose-600'}">${formatMathHTML(item.userAnswer)}</strong></span>
+                            <span class="bg-emerald-600 text-white px-3 py-1 rounded-xl">正確答案：<strong>${formatMathHTML(item.q.answer)}</strong></span>
+                        </div>
+                        <div class="text-xs sm:text-sm text-gray-700 bg-white/75 p-2.5 rounded-xl font-medium">
+                            <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i> ${formatMathHTML(item.q.explanation)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function startSoloRetryWrong() {
+            const wrongQuestions = state.solo.history
+                .filter(item => !item.isCorrect)
+                .map(item => ({
+                    ...item.q,
+                    options: item.q.options ? shuffleArray(item.q.options) : []
+                }));
+            if (wrongQuestions.length === 0) return;
+            handleStartSoloGame(wrongQuestions);
+        }
+
+        // ==================== 老師端多人房間創建 ====================
+        async function allocateShortRoomPin() {
+            const snap = await db.ref(ROOMS_PATH).once('value');
+            const rooms = snap.val() || {};
+            const now = Date.now();
+            const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+            const singleDigits = shuffleArray([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            for (const pin of singleDigits) {
+                const r = rooms[pin];
+                if (!r || (now - (r.createdAt || 0) > TWO_HOURS)) {
+                    return String(pin);
+                }
+            }
+
+            const doubleDigits = [];
+            for (let i = 10; i <= 99; i++) doubleDigits.push(i);
+            for (const pin of shuffleArray(doubleDigits)) {
+                const r = rooms[pin];
+                if (!r || (now - (r.createdAt || 0) > TWO_HOURS)) {
+                    return String(pin);
+                }
+            }
+            return String(randInt(1, 99));
+        }
+
+        async function handleCreateRoom() {
+            const topics = getSelectedTopicsFromUI();
+
+            if (!hasAnyTopicSelected(topics)) {
+                showModal('請選擇單元', '請至少勾選一個五年級考核單元！');
+                return;
+            }
+
+            if (!db) {
+                showModal('無法連接伺服器', '目前無法連線至即時資料庫，請檢查網絡，或改用「單人自學模式」。');
+                return;
+            }
+
+            const customQ = parseInt(document.getElementById('customQCountInput').value, 10);
+            const customTime = parseInt(document.getElementById('customTimeLimitInput').value, 10);
+
+            if (isNaN(customQ) || customQ < 1 || customQ > 50) {
+                showModal('題目數目設定錯誤', '請輸入 1 至 50 之間的題目數量！');
+                return;
+            }
+            if (isNaN(customTime) || customTime < 5 || customTime > 300) {
+                showModal('作答時間設定錯誤', '多人比賽每題作答時間請設定在 5 至 300 秒之間！');
+                return;
+            }
+
+            state.setup.qCount = customQ;
+            state.setup.timeLimit = customTime;
+
+            const submitBtn = document.getElementById('createRoomSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在開啟房間...';
+
+            try {
+                const pin = await allocateShortRoomPin();
+                const questions = generateQuestionDeck(state.setup.qCount, topics, state.setup.qFormat);
+
+                const roomPayload = {
+                    pin: pin,
+                    status: 'lobby',
+                    createdAt: Date.now(),
+                    config: {
+                        qCount: state.setup.qCount,
+                        timeLimit: state.setup.timeLimit,
+                        qFormat: state.setup.qFormat,
+                        topics: topics
+                    },
+                    currentQIndex: 0,
+                    questionStartTime: 0,
+                    questions: questions,
+                    players: {}
+                };
+
+                await db.ref(`${ROOMS_PATH}/${pin}`).set(roomPayload);
+                db.ref(`${ROOMS_PATH}/${pin}`).onDisconnect().remove();
+
+                state.role = 'host';
+                state.roomPin = pin;
+                playSfx('join');
+                subscribeToRoom(pin);
+            } catch (err) {
+                console.error(err);
+                showModal('連線錯誤', '無法建立房間，請檢查網絡連線後再試。');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-rocket"></i><span id="setupPrimaryBtnText">立即開啟房間</span>';
+            }
+        }
+
+        async function handleRegenerateQuestions() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const cfg = state.roomData.config;
+            const newQuestions = generateQuestionDeck(cfg.qCount, cfg.topics, cfg.qFormat);
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}/questions`).set(newQuestions);
+            playSfx('click');
+            showModal('已重新抽題', `已重新隨機生成 ${cfg.qCount} 條五年級分數題目！`);
+        }
+
+        /**************************************************************
+         * 7. 學生端加入房間流程
+         **************************************************************/
+        async function handleCheckRoomPin() {
+            const rawPin = document.getElementById('joinPinInput').value.trim();
+            if (!rawPin) {
+                showModal('請輸入房號', '請輸入老師螢幕上顯示的 1 至 2 位數字房號。');
+                return;
+            }
+
+            try {
+                const snap = await db.ref(`${ROOMS_PATH}/${rawPin}`).once('value');
+                if (!snap.exists()) {
+                    showModal('找不到房間', `房號「${rawPin}」目前沒有開啟，請確認房號是否正確。`);
+                    return;
+                }
+                const room = snap.val();
+                if (room.status === 'finished') {
+                    showModal('比賽已結束', '這個房間的比賽已經結束了！');
+                    return;
+                }
+
+                state.roomPin = rawPin;
+                document.getElementById('studentJoinPinDisplay').textContent = rawPin;
+                playSfx('click');
+                showView('view-student-profile');
+                setTimeout(() => document.getElementById('studentNameInput').focus(), 100);
+            } catch (err) {
+                console.error(err);
+                showModal('連線失敗', '讀取房間資料時發生錯誤，請稍後再試。');
+            }
+        }
+
+        async function handleStudentJoinLobby() {
+            const classNo = parseInt(document.getElementById('studentClassNo').value, 10);
+            const name = document.getElementById('studentNameInput').value.trim();
+
+            if (!name) {
+                showModal('請輸入姓名', '請填寫你的姓名以便顯示在排行榜上！');
+                return;
+            }
+
+            try {
+                const snap = await db.ref(`${ROOMS_PATH}/${state.roomPin}`).once('value');
+                if (!snap.exists()) {
+                    showModal('房間已關閉', '老師已關閉此房間。', () => showView('view-home'));
+                    return;
+                }
+
+                const playerId = 'p_' + classNo + '_' + Math.random().toString(36).substring(2, 7);
+                state.role = 'student';
+                state.playerId = playerId;
+                state.classNo = classNo;
+                state.playerName = name;
+
+                const playerObj = {
+                    id: playerId,
+                    classNo: classNo,
+                    name: name,
+                    score: 0,
+                    lastDelta: 0,
+                    lastCorrect: false,
+                    streak: 0,
+                    correctCount: 0,
+                    joinedAt: Date.now()
+                };
+
+                const playerRef = db.ref(`${ROOMS_PATH}/${state.roomPin}/players/${playerId}`);
+                await playerRef.set(playerObj);
+                playerRef.onDisconnect().remove();
+
+                playSfx('join');
+                subscribeToRoom(state.roomPin);
+            } catch (err) {
+                console.error(err);
+                showModal('加入失敗', '無法加入房間，請重試。');
+            }
+        }
+
+        /**************************************************************
+         * 8. 即時資料庫監聽與狀態同步引擎
+         **************************************************************/
+        function subscribeToRoom(pin) {
+            if (state.roomRef) state.roomRef.off();
+            state.roomRef = db.ref(`${ROOMS_PATH}/${pin}`);
+
+            state.roomRef.on('value', snapshot => {
+                const data = snapshot.val();
+                if (!data) {
+                    if (state.role === 'student') {
+                        clearInterval(state.timerInterval);
+                        showModal('房間已結束', '老師已關閉房間，將返回主頁。', () => cleanupAndGoHome());
+                    }
+                    return;
+                }
+
+                // 若學生被老師踢出
+                if (state.role === 'student' && state.playerId) {
+                    const players = data.players || {};
+                    if (!players[state.playerId]) {
+                        clearInterval(state.timerInterval);
+                        state.roomRef.off();
+                        state.roomPin = null;
+                        showModal('已離開房間', '你已被主持人移出房間。', () => showView('view-home'));
+                        return;
+                    }
+                }
+
+                state.roomData = data;
+                syncUIWithRoomState(data);
+            });
+        }
+
+        function syncUIWithRoomState(room) {
+            const statusChanged = state.lastRenderedStatus !== room.status;
+            const qIndexChanged = state.lastRenderedQIndex !== room.currentQIndex;
+
+            state.lastRenderedStatus = room.status;
+            state.lastRenderedQIndex = room.currentQIndex;
+
+            if (room.status === 'lobby') {
+                clearInterval(state.timerInterval);
+                renderLobbyView(room);
+            } else if (room.status === 'question') {
+                if (statusChanged || qIndexChanged) {
+                    state.hasSubmittedCurrentQ = false;
+                    playSfx('start');
+                    setupQuestionView(room);
+                }
+                updateQuestionLiveProgress(room);
+            } else if (room.status === 'leaderboard') {
+                clearInterval(state.timerInterval);
+                if (statusChanged) {
+                    renderLeaderboardView(room);
+                } else {
+                    updateLeaderboardRowsOnly(room);
+                }
+            } else if (room.status === 'finished') {
+                clearInterval(state.timerInterval);
+                if (statusChanged) {
+                    playSfx('podium');
+                    triggerConfetti();
+                    renderPodiumView(room);
+                }
+            }
+        }
+
+        /**************************************************************
+         * 9. 畫面渲染：等候大廳 (LOBBY)
+         **************************************************************/
+        function renderLobbyView(room) {
+            showView('view-lobby');
+            document.getElementById('lobbyPinNumber').textContent = room.pin;
+
+            const cfg = room.config;
+            document.getElementById('lobbyConfigSummary').textContent = `${cfg.qCount} 題 · 每題 ${cfg.timeLimit} 秒`;
+
+            const topicNames = [];
+            if (cfg.topics && cfg.topics.expandReduce) topicNames.push('擴分/約分');
+            if (cfg.topics && cfg.topics.fractionAddSub) topicNames.push('異分母分數加減');
+            document.getElementById('lobbyTopicsSummary').textContent = `單元：${topicNames.join('、')}`;
+
+            const hostActions = document.getElementById('hostLobbyActions');
+            const studentBadge = document.getElementById('studentLobbyBadge');
+            const kickHint = document.getElementById('hostKickHint');
+
+            if (state.role === 'host') {
+                hostActions.classList.remove('hidden');
+                hostActions.classList.add('flex');
+                studentBadge.classList.add('hidden');
+                kickHint.classList.remove('hidden');
+            } else {
+                hostActions.classList.add('hidden');
+                hostActions.classList.remove('flex');
+                studentBadge.classList.remove('hidden');
+                kickHint.classList.add('hidden');
+                document.getElementById('studentSelfTag').textContent = `[${state.classNo}號] ${state.playerName}`;
+            }
+
+            const playersObj = room.players || {};
+            const playerList = Object.values(playersObj).sort((a, b) => a.classNo - b.classNo);
+            document.getElementById('lobbyPlayerCount').textContent = playerList.length;
+
+            const grid = document.getElementById('lobbyPlayersGrid');
+            if (playerList.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-10 text-center text-purple-200/70">
+                        <i class="fa-solid fa-hourglass-half text-3xl mb-2 animate-pulse"></i>
+                        <p class="font-bold">正在等待學生輸入房號「${room.pin}」加入...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = playerList.map(p => {
+                const isMe = p.id === state.playerId;
+                const highlightClass = isMe
+                    ? 'bg-amber-300 text-purple-950 border-amber-500 ring-4 ring-amber-300/40'
+                    : 'bg-white text-gray-900 border-gray-300';
+                const clickAttr = state.role === 'host' ? `onclick="hostKickPlayer('${p.id}', '${escapeHtml(p.name)}')" title="點擊移出學生"` : '';
+                const cursorClass = state.role === 'host' ? 'cursor-pointer hover:bg-rose-50 hover:border-rose-400' : '';
+
+                return `
+                    <div ${clickAttr} class="${highlightClass} ${cursorClass} rounded-2xl px-4 py-3 shadow border-b-4 flex items-center justify-between transition animate-pop">
+                        <div class="flex items-center gap-2 truncate">
+                            <span class="bg-purple-700 text-white text-xs font-black px-2 py-0.5 rounded-lg shrink-0">${p.classNo}號</span>
+                            <span class="font-black truncate">${escapeHtml(p.name)}</span>
+                        </div>
+                        ${state.role === 'host' ? '<i class="fa-solid fa-xmark text-gray-400 hover:text-rose-600 text-sm ml-1"></i>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function hostKickPlayer(playerId, name) {
+            if (state.role !== 'host') return;
+            showModal('移出學生', `確定要將「${name}」移出房間嗎？`, () => {
+                db.ref(`${ROOMS_PATH}/${state.roomPin}/players/${playerId}`).remove();
+            }, true);
+        }
+
+        async function hostStartGame() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const players = state.roomData.players || {};
+            if (Object.keys(players).length === 0) {
+                showModal('尚無學生加入', '請等待至少 1 位學生加入房間後再開始比賽！');
+                return;
+            }
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                status: 'question',
+                currentQIndex: 0,
+                questionStartTime: Date.now(),
+                currentAnswers: null
+            });
+        }
+
+        /**************************************************************
+         * 10. 畫面渲染與計時：作答階段 (QUESTION PHASE)
+         **************************************************************/
+        function setupQuestionView(room) {
+            showView('view-question');
+
+            const qIndex = room.currentQIndex || 0;
+            const totalQ = room.questions.length;
+            const q = room.questions[qIndex];
+
+            document.getElementById('qProgressBadge').textContent = `第 ${qIndex + 1} / ${totalQ} 題`;
+            document.getElementById('qTopicBadge').textContent = q.topic;
+            document.getElementById('questionText').innerHTML = formatMathHTML(q.prompt);
+
+            const studentHeader = document.getElementById('studentScoreHeader');
+            const hostControls = document.getElementById('hostQuestionControls');
+
+            if (state.role === 'student') {
+                studentHeader.classList.remove('hidden');
+                studentHeader.classList.add('flex');
+                hostControls.classList.add('hidden');
+                hostControls.classList.remove('flex');
+
+                const me = (room.players && room.players[state.playerId]) || { score: 0, streak: 0 };
+                document.getElementById('studentCurrentScore').textContent = me.score || 0;
+                const streakBadge = document.getElementById('studentStreakBadge');
+                if ((me.streak || 0) >= 2) {
+                    streakBadge.classList.remove('hidden');
+                    streakBadge.classList.add('flex');
+                    document.getElementById('studentStreakCount').textContent = me.streak;
+                } else {
+                    streakBadge.classList.add('hidden');
+                }
+            } else {
+                studentHeader.classList.add('hidden');
+                hostControls.classList.remove('hidden');
+                hostControls.classList.add('flex');
+            }
+
+            const existingAns = room.currentAnswers && room.currentAnswers[state.playerId];
+            if (state.role === 'student' && existingAns) {
+                state.hasSubmittedCurrentQ = true;
+            }
+
+            const mcArea = document.getElementById('mcAnswerArea');
+            const fillArea = document.getElementById('fillAnswerArea');
+            const waitBox = document.getElementById('studentSubmittedWait');
+
+            if (state.role === 'student' && state.hasSubmittedCurrentQ) {
+                mcArea.classList.add('hidden');
+                fillArea.classList.add('hidden');
+                waitBox.classList.remove('hidden');
+                document.getElementById('studentSubmittedChoiceText').innerHTML = formatMathHTML(`你的作答：${existingAns.value}`);
+            } else {
+                waitBox.classList.add('hidden');
+                if (q.format === 'mc') {
+                    mcArea.classList.remove('hidden');
+                    fillArea.classList.add('hidden');
+                    q.options.forEach((optText, idx) => {
+                        document.getElementById(`mc-text-${idx}`).innerHTML = formatMathHTML(optText);
+                        const btn = document.getElementById(`mc-btn-${idx}`);
+                        btn.disabled = (state.role === 'host');
+                        btn.classList.toggle('cursor-default', state.role === 'host');
+                    });
+                } else {
+                    mcArea.classList.add('hidden');
+                    fillArea.classList.remove('hidden');
+                    const studentFill = document.getElementById('studentFillControls');
+                    const hostFill = document.getElementById('hostFillNotice');
+                    if (state.role === 'student') {
+                        studentFill.classList.remove('hidden');
+                        hostFill.classList.add('hidden');
+                        const inputBox = document.getElementById('fillInputBox');
+                        inputBox.value = '';
+                        setTimeout(() => inputBox.focus(), 100);
+                    } else {
+                        studentFill.classList.add('hidden');
+                        hostFill.classList.remove('hidden');
+                    }
+                }
+            }
+
+            startQuestionCountdown(room);
+        }
+
+        function startQuestionCountdown(room) {
+            clearInterval(state.timerInterval);
+            const timeLimitSec = room.config.timeLimit || 30;
+            const startTime = room.questionStartTime || Date.now();
+            const timerCircle = document.getElementById('timerCircle');
+            const timerBar = document.getElementById('timerBar');
+            let lastWholeSec = -1;
+
+            state.timerInterval = setInterval(() => {
+                const elapsedSec = (Date.now() - startTime) / 1000;
+                const remaining = Math.max(0, timeLimitSec - elapsedSec);
+                const wholeSec = Math.ceil(remaining);
+
+                timerCircle.textContent = wholeSec;
+                const pct = Math.max(0, Math.min(100, (remaining / timeLimitSec) * 100));
+                timerBar.style.width = `${pct}%`;
+
+                if (wholeSec <= 5 && wholeSec > 0 && wholeSec !== lastWholeSec) {
+                    lastWholeSec = wholeSec;
+                    playSfx('tick');
+                    timerCircle.classList.add('bg-rose-600', 'scale-110');
+                    setTimeout(() => timerCircle.classList.remove('scale-110'), 150);
+                } else if (wholeSec > 5) {
+                    timerCircle.classList.remove('bg-rose-600');
+                }
+
+                if (remaining <= 0) {
+                    clearInterval(state.timerInterval);
+                    if (state.role === 'host') {
+                        hostFinalizeQuestionRound();
+                    }
+                }
+            }, 100);
+        }
+
+        function updateQuestionLiveProgress(room) {
+            const players = room.players || {};
+            const totalPlayers = Object.keys(players).length;
+            const answers = room.currentAnswers || {};
+            const answeredCount = Object.keys(answers).length;
+
+            if (state.role === 'host') {
+                document.getElementById('hostAnsweredCount').textContent = `${answeredCount} / ${totalPlayers}`;
+                if (totalPlayers > 0 && answeredCount >= totalPlayers) {
+                    clearInterval(state.timerInterval);
+                    setTimeout(() => {
+                        if (state.roomData && state.roomData.status === 'question') {
+                            hostFinalizeQuestionRound();
+                        }
+                    }, 350);
+                }
+            }
+        }
+
+        // 學生提交選擇題答案 (同時支援多人連線與單人自學模式)
+        function submitStudentAnswer(optionIndex) {
+            if (state.hasSubmittedCurrentQ) return;
+            if (state.role === 'solo') {
+                const q = state.solo.questions[state.solo.currentQIndex];
+                evaluateSoloAnswer(q.options[optionIndex], false);
+                return;
+            }
+            if (state.role !== 'student' || !state.roomData) return;
+            const q = state.roomData.questions[state.roomData.currentQIndex];
+            const chosenValue = q.options[optionIndex];
+            sendAnswerToFirebase(chosenValue);
+        }
+
+        // 填充題小鍵盤輔助 (支援輸入數字及分數線 '/')
+        function appendFillDigit(digit) {
+            playSfx('click');
+            const input = document.getElementById('fillInputBox');
+            if (digit === '/') {
+                if (!input.value || input.value.includes('/')) return;
+            }
+            if (input.value.length < 10) {
+                input.value += digit;
+            }
+        }
+        function clearFillInput() {
+            playSfx('click');
+            document.getElementById('fillInputBox').value = '';
+        }
+        function backspaceFillInput() {
+            playSfx('click');
+            const input = document.getElementById('fillInputBox');
+            input.value = input.value.slice(0, -1);
+        }
+
+        function submitFillAnswer() {
+            if (state.hasSubmittedCurrentQ) return;
+            const val = normalizeAnswerStr(document.getElementById('fillInputBox').value);
+            if (val === '' || val.endsWith('/')) {
+                showModal('請輸入完整答案', '請先輸入完整的數字或最簡分數（如 7/4）再按提交！');
+                return;
+            }
+            if (state.role === 'solo') {
+                evaluateSoloAnswer(val, false);
+                return;
+            }
+            if (state.role !== 'student' || !state.roomData) return;
+            sendAnswerToFirebase(val);
+        }
+
+        async function sendAnswerToFirebase(answerStr) {
+            state.hasSubmittedCurrentQ = true;
+            playSfx('click');
+            const normalized = normalizeAnswerStr(answerStr);
+
+            document.getElementById('mcAnswerArea').classList.add('hidden');
+            document.getElementById('fillAnswerArea').classList.add('hidden');
+            const waitBox = document.getElementById('studentSubmittedWait');
+            waitBox.classList.remove('hidden');
+            document.getElementById('studentSubmittedChoiceText').innerHTML = formatMathHTML(`你的作答：${normalized}`);
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}/currentAnswers/${state.playerId}`).set({
+                value: normalized,
+                submittedAt: Date.now()
+            });
+        }
+
+        function hostEndQuestionNow() {
+            if (state.role !== 'host') return;
+            clearInterval(state.timerInterval);
+            hostFinalizeQuestionRound();
+        }
+
+        // 老師端統一計算本題所有學生得分並寫入 RTDB，切換至 leaderboard 狀態
+        async function hostFinalizeQuestionRound() {
+            if (state.role !== 'host' || !state.roomData || state.roomData.status !== 'question') return;
+
+            const room = state.roomData;
+            const q = room.questions[room.currentQIndex];
+            const correctAns = normalizeAnswerStr(q.answer);
+            const startTime = room.questionStartTime || Date.now();
+            const timeLimitMs = (room.config.timeLimit || 30) * 1000;
+
+            const players = room.players || {};
+            const answers = room.currentAnswers || {};
+            const updatedPlayers = {};
+
+            Object.keys(players).forEach(pid => {
+                const p = { ...players[pid] };
+                const submission = answers[pid];
+
+                if (submission && normalizeAnswerStr(submission.value) === correctAns) {
+                    const responseTimeMs = Math.max(0, (submission.submittedAt || Date.now()) - startTime);
+                    const timeRatio = Math.max(0, Math.min(1, 1 - (responseTimeMs / timeLimitMs)));
+                    const earned = Math.round(500 + 500 * timeRatio);
+
+                    p.score = (p.score || 0) + earned;
+                    p.lastDelta = earned;
+                    p.lastCorrect = true;
+                    p.streak = (p.streak || 0) + 1;
+                    p.correctCount = (p.correctCount || 0) + 1;
+                } else {
+                    p.lastDelta = 0;
+                    p.lastCorrect = false;
+                    p.streak = 0;
+                }
+                updatedPlayers[pid] = p;
+            });
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                players: updatedPlayers,
+                status: 'leaderboard'
+            });
+        }
+
+        /**************************************************************
+         * 11. 畫面渲染：每題詳解與即時排行榜 (LEADERBOARD PHASE)
+         **************************************************************/
+        function renderLeaderboardView(room) {
+            showView('view-leaderboard');
+            document.getElementById('multiplayerLeaderboardCard').classList.remove('hidden');
+            document.getElementById('soloNextActionCard').classList.add('hidden');
+
+            const qIndex = room.currentQIndex || 0;
+            const totalQ = room.questions.length;
+            const q = room.questions[qIndex];
+            const playersObj = room.players || {};
+            const playerList = Object.values(playersObj);
+            const sortedPlayers = [...playerList].sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+
+            // 題目詳解區
+            document.getElementById('reviewTopicTag').textContent = `單元：${q.topic}`;
+            document.getElementById('reviewQuestionText').innerHTML = formatMathHTML(q.prompt);
+            document.getElementById('reviewCorrectAnswer').innerHTML = formatMathHTML(q.answer);
+            document.getElementById('reviewExplanation').innerHTML = formatMathHTML(`解說：${q.explanation}`);
+
+            const correctCount = playerList.filter(p => p.lastCorrect).length;
+            document.getElementById('reviewStatsBadge').textContent = `本題答對人數：${correctCount} / ${playerList.length} 人`;
+
+            // 學生端顯示個人對錯橫幅與音效
+            const feedbackBanner = document.getElementById('studentRoundFeedback');
+            if (state.role === 'student' && playersObj[state.playerId]) {
+                feedbackBanner.classList.remove('hidden');
+                const me = playersObj[state.playerId];
+                const myRank = sortedPlayers.findIndex(p => p.id === state.playerId) + 1;
+
+                if (me.lastCorrect) {
+                    playSfx('correct');
+                    feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-emerald-600 border-emerald-800 text-white';
+                    document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-check"></i>';
+                    document.getElementById('feedbackTitle').textContent = me.streak >= 2 ? `答對了！（連中 ${me.streak} 題🔥）` : '答對了！做得好！';
+                    document.getElementById('feedbackSub').textContent = `目前總分 ${me.score} 分 · 全班排第 ${myRank} 名`;
+                    document.getElementById('feedbackDelta').textContent = `+${me.lastDelta}`;
+                } else {
+                    playSfx('wrong');
+                    feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-rose-600 border-rose-800 text-white';
+                    document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                    document.getElementById('feedbackTitle').textContent = '這題答錯了，繼續加油！';
+                    document.getElementById('feedbackSub').textContent = `看看下方解說，下一題追回來！目前排第 ${myRank} 名`;
+                    document.getElementById('feedbackDelta').textContent = '+0';
+                }
+            } else {
+                feedbackBanner.classList.add('hidden');
+                playSfx('correct');
+            }
+
+            // 老師端下一題按鈕
+            const nextBtn = document.getElementById('hostNextQuestionBtn');
+            if (state.role === 'host') {
+                nextBtn.classList.remove('hidden');
+                nextBtn.classList.add('flex');
+                const isLast = (qIndex + 1) >= totalQ;
+                document.getElementById('hostNextBtnText').textContent = isLast ? '查看最終頒獎台' : '下一題';
+            } else {
+                nextBtn.classList.add('hidden');
+            }
+
+            updateLeaderboardRowsOnly(room);
+        }
+
+        function updateLeaderboardRowsOnly(room) {
+            const playersObj = room.players || {};
+            const sortedPlayers = Object.values(playersObj).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+            const listEl = document.getElementById('leaderboardList');
+
+            listEl.innerHTML = sortedPlayers.map((p, idx) => {
+                const rank = idx + 1;
+                const isMe = p.id === state.playerId;
+
+                let rankBadge = `<span class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center font-black text-sm">${rank}</span>`;
+                if (rank === 1) rankBadge = `<span class="w-8 h-8 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center font-black text-sm shadow"><i class="fa-solid fa-crown"></i></span>`;
+                else if (rank === 2) rankBadge = `<span class="w-8 h-8 rounded-full bg-slate-300 text-slate-900 flex items-center justify-center font-black text-sm shadow">2</span>`;
+                else if (rank === 3) rankBadge = `<span class="w-8 h-8 rounded-full bg-amber-700 text-amber-100 flex items-center justify-center font-black text-sm shadow">3</span>`;
+
+                const rowBg = isMe
+                    ? 'bg-amber-400/25 border-2 border-amber-300'
+                    : 'bg-white/10 border border-white/10';
+
+                const deltaBadge = p.lastDelta > 0
+                    ? `<span class="bg-emerald-500 text-white text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl shadow animate-bounce">+${p.lastDelta}</span>`
+                    : `<span class="bg-white/10 text-purple-200 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-xl">+0</span>`;
+
+                return `
+                    <div class="${rowBg} rounded-2xl px-4 py-3 flex items-center justify-between transition">
+                        <div class="flex items-center gap-3 min-w-0">
+                            ${rankBadge}
+                            <span class="bg-purple-800 border border-purple-400/40 text-xs font-black px-2 py-0.5 rounded-lg shrink-0">${p.classNo}號</span>
+                            <span class="font-black text-base sm:text-lg truncate">${escapeHtml(p.name)}</span>
+                            ${isMe ? '<span class="text-xs bg-amber-300 text-purple-950 font-black px-2 py-0.5 rounded-full">你</span>' : ''}
+                            ${(p.streak || 0) >= 2 ? `<span class="text-xs bg-orange-500/90 text-white font-black px-2 py-0.5 rounded-full"><i class="fa-solid fa-fire"></i> ${p.streak}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            ${deltaBadge}
+                            <div class="text-right min-w-[70px]">
+                                <span class="text-lg sm:text-xl font-black text-amber-300">${p.score || 0}</span>
+                                <span class="text-xs text-purple-200">分</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function hostNextQuestion() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const nextIdx = (state.roomData.currentQIndex || 0) + 1;
+            const totalQ = state.roomData.questions.length;
+
+            if (nextIdx >= totalQ) {
+                await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                    status: 'finished'
+                });
+            } else {
+                await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                    status: 'question',
+                    currentQIndex: nextIdx,
+                    questionStartTime: Date.now(),
+                    currentAnswers: null
+                });
+            }
+        }
+
+        /**************************************************************
+         * 12. 畫面渲染：最終頒獎台與匯出成績 (PODIUM VIEW)
+         **************************************************************/
+        function renderPodiumView(room) {
+            showView('view-podium');
+
+            const playersObj = room.players || {};
+            const sortedPlayers = Object.values(playersObj).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+            const totalQ = room.questions ? room.questions.length : 10;
+
+            const top1 = sortedPlayers[0];
+            const top2 = sortedPlayers[1];
+            const top3 = sortedPlayers[2];
+
+            document.getElementById('podium1-name').textContent = top1 ? `[${top1.classNo}號] ${top1.name}` : '從缺';
+            document.getElementById('podium1-score').textContent = top1 ? `${top1.score} 分` : '';
+
+            document.getElementById('podium2-name').textContent = top2 ? `[${top2.classNo}號] ${top2.name}` : '從缺';
+            document.getElementById('podium2-score').textContent = top2 ? `${top2.score} 分` : '';
+
+            document.getElementById('podium3-name').textContent = top3 ? `[${top3.classNo}號] ${top3.name}` : '從缺';
+            document.getElementById('podium3-score').textContent = top3 ? `${top3.score} 分` : '';
+
+            const playAgainBtn = document.getElementById('hostPlayAgainBtn');
+            if (state.role === 'host') {
+                playAgainBtn.classList.remove('hidden');
+                playAgainBtn.classList.add('inline-flex');
+            } else {
+                playAgainBtn.classList.add('hidden');
+            }
+
+            const tableEl = document.getElementById('finalScoreTable');
+            tableEl.innerHTML = sortedPlayers.map((p, idx) => {
+                const rank = idx + 1;
+                const isMe = p.id === state.playerId;
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl ${isMe ? 'bg-amber-100 border-2 border-amber-400' : 'bg-gray-50 border border-gray-200'}">
+                        <div class="flex items-center gap-3">
+                            <span class="w-7 h-7 rounded-full ${rank <= 3 ? 'bg-purple-700 text-white' : 'bg-gray-200 text-gray-700'} font-black text-xs flex items-center justify-center">${rank}</span>
+                            <span class="bg-purple-100 text-purple-800 text-xs font-black px-2.5 py-1 rounded-lg">${p.classNo}號</span>
+                            <span class="font-black text-gray-900">${escapeHtml(p.name)}</span>
+                        </div>
+                        <div class="flex items-center gap-4 text-sm">
+                            <span class="text-gray-500 font-bold">答對 <strong class="text-emerald-700">${p.correctCount || 0} / ${totalQ}</strong> 題</span>
+                            <span class="font-black text-base text-purple-800 min-w-[75px] text-right">${p.score || 0} 分</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 老師原房重新抽題再玩一局（學生不需重新輸入房號）
+        async function hostRestartLobby() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const cfg = state.roomData.config;
+            const newQuestions = generateQuestionDeck(cfg.qCount, cfg.topics, cfg.qFormat);
+
+            const players = state.roomData.players || {};
+            const resetPlayers = {};
+            Object.keys(players).forEach(pid => {
+                resetPlayers[pid] = {
+                    ...players[pid],
+                    score: 0,
+                    lastDelta: 0,
+                    lastCorrect: false,
+                    streak: 0,
+                    correctCount: 0
+                };
+            });
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                status: 'lobby',
+                currentQIndex: 0,
+                questionStartTime: 0,
+                questions: newQuestions,
+                players: resetPlayers,
+                currentAnswers: null
+            });
+        }
+
+        function exportScoresCSV() {
+            if (!state.roomData || !state.roomData.players) return;
+            const totalQ = state.roomData.questions ? state.roomData.questions.length : 10;
+            const sorted = Object.values(state.roomData.players).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+
+            let csvContent = "\uFEFF名次,學號,姓名,總分,答對題數,總題數\n";
+            sorted.forEach((p, i) => {
+                csvContent += `${i + 1},${p.classNo},"${p.name.replace(/"/g, '""')}",${p.score || 0},${p.correctCount || 0},${totalQ}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `LTMPS_Kahoot_小五數學比賽成績_房號${state.roomPin}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti !== 'function') return;
+            confetti({
+                particleCount: 90,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        /**************************************************************
+         * 13. 啟動初始化與全域函數掛載
+         **************************************************************/
+        Object.assign(window, {
+            showView,
+            showModal,
+            confirmReturnHome,
+            cleanupAndGoHome,
+            toggleSound,
+            openSetupModal,
+            handleSetupPrimaryAction,
+            toggleAllTopics,
+            selectOption,
+            handleCustomInput,
+            handleCreateRoom,
+            handleRegenerateQuestions,
+            handleCheckRoomPin,
+            handleStudentJoinLobby,
+            hostKickPlayer,
+            hostStartGame,
+            submitStudentAnswer,
+            appendFillDigit,
+            clearFillInput,
+            backspaceFillInput,
+            submitFillAnswer,
+            hostEndQuestionNow,
+            hostNextQuestion,
+            hostRestartLobby,
+            exportScoresCSV,
+            soloNextQuestion,
+            startSoloRetryWrong
+        });
+
+        function initClassNoDropdown() {
+            const selectEl = document.getElementById('studentClassNo');
+            if (!selectEl) return;
+            let optsHtml = '';
+            for (let i = 1; i <= 35; i++) {
+                optsHtml += `<option value="${i}">${i} 號</option>`;
+            }
+            selectEl.innerHTML = optsHtml;
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initClassNoDropdown);
+        } else {
+            initClassNoDropdown();
+        }
+    </script>
+</body>
+</html>
