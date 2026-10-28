@@ -680,7 +680,23 @@
                             8 的第 3 個倍數是 _____
                         </h3>
                     </div>
-                <!-- 即時積分排行榜及分數變化 (多人比賽顯示) -->
+                    <div class="bg-emerald-50 border-2 border-emerald-500 px-4 py-2.5 rounded-2xl shrink-0 text-center sm:text-right">
+                        <div class="text-xs font-bold text-emerald-700">正確答案</div>
+                        <div id="reviewCorrectAnswer" class="text-2xl sm:text-3xl font-black text-emerald-800">24</div>
+                    </div>
+                </div>
+                <div class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <div class="flex items-start gap-2 text-gray-700 font-bold">
+                        <i class="fa-solid fa-lightbulb text-amber-500 mt-1"></i>
+                        <span id="reviewExplanation">解說：8 × 3 = 24，所以 8 的第 3 個倍數是 24。</span>
+                    </div>
+                    <span id="reviewStatsBadge" class="text-xs font-black bg-gray-100 text-gray-600 px-3 py-1 rounded-full shrink-0 self-start sm:self-center">
+                        本題答對人數：0 / 0 人
+                    </span>
+                </div>
+            </div>
+
+            <!-- 即時積分排行榜及分數變化 (多人比賽顯示) -->
             <div id="multiplayerLeaderboardCard" class="bg-black/30 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-white/15 shadow-2xl">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-2.5">
@@ -2784,6 +2800,17 @@
             if (state.role === 'host') {
                 document.getElementById('hostAnsweredCount').textContent = `${answeredCount} / ${totalPlayers}`;
                 // 若全員皆已作答，自動提前結束倒數並揭曉
+                if (totalPlayers > 0 && answeredCount >= totalPlayers) {
+                    clearInterval(state.timerInterval);
+                    setTimeout(() => {
+                        if (state.roomData && state.roomData.status === 'question') {
+                            hostFinalizeQuestionRound();
+                        }
+                    }, 350);
+                }
+            }
+        }
+
         // 學生提交選擇題答案 (同時支援多人連線與單人自學模式)
         function submitStudentAnswer(optionIndex) {
             if (state.hasSubmittedCurrentQ) return;
