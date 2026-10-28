@@ -281,57 +281,103 @@
 
                 <!-- 1. 挑選單元 -->
                 <div class="mb-6">
-                    <div class="flex items-center justify-between mb-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                         <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
-                            1. 挑選考核單元（可多選）
+                            1. 挑選考核單元（共 12 個單元，可多選）
                         </label>
-                        <div class="flex gap-2 text-xs">
+                        <div class="flex flex-wrap gap-2 text-xs">
                             <button type="button" onclick="toggleAllTopics(true)" class="text-purple-700 font-bold hover:underline">全選</button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="toggleCategoryTopics('mental')" class="text-emerald-700 font-bold hover:underline">只選速算與加減</button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="toggleCategoryTopics('p4core')" class="text-blue-700 font-bold hover:underline">只選小四核心單元</button>
                             <span class="text-gray-300">|</span>
                             <button type="button" onclick="toggleAllTopics(false)" class="text-gray-500 font-bold hover:underline">全部取消</button>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-multiples" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">倍數</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">倍數</div>
                                 <div class="text-xs text-gray-500 mt-0.5">第N個倍數、判斷倍數、上下一個倍數</div>
                             </div>
                         </label>
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-factors" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">因數</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">因數</div>
                                 <div class="text-xs text-gray-500 mt-0.5">判斷因數、因數與倍數關係、因數數量</div>
                             </div>
                         </label>
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-primes" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">質數及合成數</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">質數及合成數</div>
                                 <div class="text-xs text-gray-500 mt-0.5">分辨100以內的質數與合成數</div>
                             </div>
                         </label>
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-multiplication" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">乘法</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">乘法</div>
                                 <div class="text-xs text-gray-500 mt-0.5">兩位×兩位、三位×兩位、乘法應用題</div>
                             </div>
                         </label>
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-division" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">除法及餘數處理</div>
-                                <div class="text-xs text-gray-500 mt-0.5">兩/三位÷兩位、最多可/最少要/餘下裝袋/還欠多少</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">除法及餘數處理</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩/三位÷兩位、最多可/最少要/餘下處理</div>
                             </div>
                         </label>
-                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
                             <input type="checkbox" id="topic-quadrilaterals" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
                             <div>
-                                <div class="font-black text-gray-900">四邊形特性與從屬</div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">四邊形特性與從屬</div>
                                 <div class="text-xs text-gray-500 mt-0.5">正方形、長方形、菱形、平行四邊形、梯形</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-add-fast" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">加法速算 (2位加2位)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩位數加兩位數心算與進位速算</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-add-carry" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">進位加法 (3位加3位)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">三位數加三位數連續進位計算</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-sub-hundred" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">整百減法 (如 300-74)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">整百數減兩位數跨位退位速算</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-sub-borrow" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">退位減法 (3位減3位)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">三位數減三位數連續退位計算</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-mul-fast" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">乘法速算 (2位乘1位)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩位數乘一位數進位心算挑戰</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-2xl p-3 flex items-start gap-2.5 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-div-fast" checked class="mt-1 w-5 h-5 accent-emerald-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900 text-sm sm:text-base">除法速算 (2位除以1位)</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩位數除以一位數整除速算</div>
                             </div>
                         </label>
                     </div>
@@ -1867,6 +1913,147 @@
                 case 21: {
                     return generateQuadrilateralQuestion();
                 }
+
+                // ==================== 單元 7：加法速算 (2位加2位) ====================
+                case 22: {
+                    const A = randInt(14, 88);
+                    const B = randInt(14, 88);
+                    const ans = A + B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const onesSum = (A % 10) + (B % 10);
+                    const noCarryTrap = ans - 10;
+                    const extraCarryTrap = ans + 10;
+                    const traps = [noCarryTrap, extraCarryTrap, ans + 1, ans - 1, ans + 2, ans - 2];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '加法速算 (2位加2位)',
+                        format: qFormat,
+                        prompt: `計算：${A} + ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} + ${B} = ${ans}（十位相加：${Math.floor(A / 10) * 10} + ${Math.floor(B / 10) * 10} = ${(Math.floor(A / 10) + Math.floor(B / 10)) * 10}，個位相加：${A % 10} + ${B % 10} = ${onesSum}，合共 ${ans}）。`
+                    };
+                }
+
+                // ==================== 單元 8：進位加法 (3位加3位) ====================
+                case 23: {
+                    const aH = randInt(1, 6);
+                    const bH = randInt(1, 8 - aH);
+                    const aT = randInt(4, 9);
+                    const bT = randInt(10 - aT, 9);
+                    const aO = randInt(3, 9);
+                    const bO = randInt(10 - aO, 9);
+                    const A = aH * 100 + aT * 10 + aO;
+                    const B = bH * 100 + bT * 10 + bO;
+                    const ans = A + B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 高誘導陷阱：忘記個位進十位 (-10)、忘記十位進百位 (-100)、兩個進位都忘記 (-110)
+                    const traps = [ans - 10, ans - 100, ans - 110, ans + 10, ans + 100];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '進位加法 (3位加3位)',
+                        format: qFormat,
+                        prompt: `計算：${A} + ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} + ${B} = ${ans}（個位 ${aO} + ${bO} = ${aO + bO} 向十位進 1；十位 ${aT} + ${bT} + 1 = ${aT + bT + 1} 向百位進 1；百位 ${aH} + ${bH} + 1 = ${aH + bH + 1}）。`
+                    };
+                }
+
+                // ==================== 單元 9：整百減法 (如 300-74) ====================
+                case 24: {
+                    const hundreds = randInt(2, 9);
+                    const A = hundreds * 100;
+                    const bT = randInt(1, 9);
+                    const bO = randInt(1, 9);
+                    const B = bT * 10 + bO;
+                    const ans = A - B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 典型陷阱：十位誤用 10 減而非 9 減 (ans + 10)、百位忘記退位 (ans + 100)、個位直接寫 bO
+                    const wrongOnes = Math.floor(ans / 10) * 10 + bO;
+                    const traps = [ans + 10, ans + 100, ans + 110, ans - 10, wrongOnes];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '整百減法',
+                        format: qFormat,
+                        prompt: `計算：${A} − ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} − ${B} = ${ans}（整百退位：百位退 1 剩 ${hundreds - 1}，十位變成 9 − ${bT} = ${9 - bT}，個位 10 − ${bO} = ${10 - bO}，答案是 ${ans}）。`
+                    };
+                }
+
+                // ==================== 單元 10：退位減法 (3位減3位) ====================
+                case 25: {
+                    const aH = randInt(3, 9);
+                    const bH = randInt(1, aH - 1);
+                    const aT = randInt(1, 6);
+                    const bT = randInt(aT + 1, 9);
+                    const aO = randInt(1, 6);
+                    const bO = randInt(aO + 1, 9);
+                    const A = aH * 100 + aT * 10 + aO;
+                    const B = bH * 100 + bT * 10 + bO;
+                    const ans = A - B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 典型陷阱：忘記十位已被借 1 (ans + 10)、忘記百位已被借 1 (ans + 100)、個位大減小倒減
+                    const reverseOnes = Math.floor(ans / 10) * 10 + (bO - aO);
+                    const traps = [ans + 10, ans + 100, ans + 110, ans - 10, reverseOnes];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '退位減法 (3位減3位)',
+                        format: qFormat,
+                        prompt: `計算：${A} − ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} − ${B} = ${ans}（個位借十位算 ${aO + 10} − ${bO} = ${aO + 10 - bO}；十位退 1 後再借百位算 ${aT - 1 + 10} − ${bT} = ${aT + 9 - bT}；百位算 ${aH - 1} − ${bH} = ${aH - 1 - bH}）。`
+                    };
+                }
+
+                // ==================== 單元 11：乘法速算 (2位乘1位) ====================
+                case 26: {
+                    const A = randInt(13, 98);
+                    const B = randInt(2, 9);
+                    const ans = A * B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const onesProd = (A % 10) * B;
+                    const tensProd = Math.floor(A / 10) * B;
+                    // 典型陷阱：忘記把個位進位加到十位
+                    const forgotCarry = tensProd * 10 + (onesProd % 10);
+                    const traps = [ans - 10, ans + 10, forgotCarry, A * (B - 1), A * (B + 1)];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '乘法速算 (2位乘1位)',
+                        format: qFormat,
+                        prompt: `計算：${A} × ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} × ${B} = ${ans}（先算 ${Math.floor(A / 10) * 10} × ${B} = ${Math.floor(A / 10) * 10 * B}，再算 ${A % 10} × ${B} = ${onesProd}，相加得 ${ans}）。`
+                    };
+                }
+
+                // ==================== 單元 12：除法速算 (2位除以1位) ====================
+                case 27: {
+                    const divisor = randInt(2, 9);
+                    const maxQ = Math.floor(99 / divisor);
+                    const minQ = Math.max(4, Math.ceil(12 / divisor));
+                    // 優先生成商為兩位數且需十位退位拆分的題目（如 72÷3=24, 85÷5=17, 96÷4=24）
+                    let ans = randInt(minQ, maxQ);
+                    if (maxQ >= 12 && Math.random() < 0.75) {
+                        ans = randInt(11, maxQ);
+                    }
+                    const dividend = divisor * ans;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [ans + 1, ans - 1, ans + 10, ans - 10, ans + 2];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法速算 (2位除以1位)',
+                        format: qFormat,
+                        prompt: `計算：${dividend} ÷ ${divisor} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `因為 ${divisor} × ${ans} = ${dividend}，所以 ${dividend} ÷ ${divisor} = ${ans}。`
+                    };
+                }
             }
         }
 
@@ -1878,6 +2065,12 @@
             if (topics.multiplication) allowedTypes.push(11, 12, 13);
             if (topics.division) allowedTypes.push(14, 15, 16, 17, 18, 19, 20);
             if (topics.quadrilaterals) allowedTypes.push(21, 21, 21);
+            if (topics.addFast) allowedTypes.push(22, 22);
+            if (topics.addCarry) allowedTypes.push(23, 23);
+            if (topics.subHundred) allowedTypes.push(24, 24);
+            if (topics.subBorrow) allowedTypes.push(25, 25);
+            if (topics.mulFast) allowedTypes.push(26, 26);
+            if (topics.divFast) allowedTypes.push(27, 27);
 
             const questions = [];
             let typeBag = [];
@@ -1948,10 +2141,44 @@
                 'topic-primes',
                 'topic-multiplication',
                 'topic-division',
-                'topic-quadrilaterals'
+                'topic-quadrilaterals',
+                'topic-add-fast',
+                'topic-add-carry',
+                'topic-sub-hundred',
+                'topic-sub-borrow',
+                'topic-mul-fast',
+                'topic-div-fast'
             ].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.checked = checked;
+            });
+        }
+
+        function toggleCategoryTopics(category) {
+            playSfx('click');
+            const p4CoreIds = [
+                'topic-multiples',
+                'topic-factors',
+                'topic-primes',
+                'topic-multiplication',
+                'topic-division',
+                'topic-quadrilaterals'
+            ];
+            const mentalIds = [
+                'topic-add-fast',
+                'topic-add-carry',
+                'topic-sub-hundred',
+                'topic-sub-borrow',
+                'topic-mul-fast',
+                'topic-div-fast'
+            ];
+            p4CoreIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = (category === 'p4core');
+            });
+            mentalIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = (category === 'mental');
             });
         }
 
@@ -2013,7 +2240,13 @@
                 primes: document.getElementById('topic-primes').checked,
                 multiplication: document.getElementById('topic-multiplication').checked,
                 division: document.getElementById('topic-division').checked,
-                quadrilaterals: document.getElementById('topic-quadrilaterals').checked
+                quadrilaterals: document.getElementById('topic-quadrilaterals').checked,
+                addFast: document.getElementById('topic-add-fast').checked,
+                addCarry: document.getElementById('topic-add-carry').checked,
+                subHundred: document.getElementById('topic-sub-hundred').checked,
+                subBorrow: document.getElementById('topic-sub-borrow').checked,
+                mulFast: document.getElementById('topic-mul-fast').checked,
+                divFast: document.getElementById('topic-div-fast').checked
             };
         }
 
@@ -2592,6 +2825,12 @@
             if (cfg.topics.multiplication) topicNames.push('乘法');
             if (cfg.topics.division) topicNames.push('除法及餘數處理');
             if (cfg.topics.quadrilaterals) topicNames.push('四邊形');
+            if (cfg.topics.addFast) topicNames.push('加法速算(2位+2位)');
+            if (cfg.topics.addCarry) topicNames.push('進位加法(3位+3位)');
+            if (cfg.topics.subHundred) topicNames.push('整百減法');
+            if (cfg.topics.subBorrow) topicNames.push('退位減法(3位-3位)');
+            if (cfg.topics.mulFast) topicNames.push('乘法速算(2位×1位)');
+            if (cfg.topics.divFast) topicNames.push('除法速算(2位÷1位)');
             document.getElementById('lobbyTopicsSummary').textContent = `單元：${topicNames.join('、')}`;
 
             const hostActions = document.getElementById('hostLobbyActions');
@@ -3182,6 +3421,7 @@
             openSetupModal,
             handleSetupPrimaryAction,
             toggleAllTopics,
+            toggleCategoryTopics,
             selectOption,
             handleCustomInput,
             handleCreateRoom,
