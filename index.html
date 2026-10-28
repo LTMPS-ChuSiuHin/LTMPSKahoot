@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LTMPS Kahoot! 小四數學即時問答比賽</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Noto Sans TC & Fredoka -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            background-color: #46178f;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 30%);
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Kahoot 經典立體按鈕特效 */
+        .btn-3d-purple {
+            background-color: #46178f;
+            box-shadow: 0 6px 0 #250952;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-purple:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #250952;
+        }
+
+        .btn-3d-dark {
+            background-color: #333333;
+            box-shadow: 0 6px 0 #111111;
+            transition: all 0.1s ease;
+        }
+        .btn-3d-dark:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #111111;
+        }
+
+        /* 四色選項按鈕 */
+        .kahoot-red {
+            background-color: #e21b3c;
+            box-shadow: 0 8px 0 #9c1128;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-red:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #9c1128;
+        }
+
+        .kahoot-blue {
+            background-color: #1368ce;
+            box-shadow: 0 8px 0 #0c4589;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-blue:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #0c4589;
+        }
+
+        .kahoot-yellow {
+            background-color: #d89e00;
+            box-shadow: 0 8px 0 #946c00;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-yellow:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #946c00;
+        }
+
+        .kahoot-green {
+            background-color: #26890c;
+            box-shadow: 0 8px 0 #185707;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .kahoot-green:active:not(:disabled) {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #185707;
+        }
+
+        /* 漂浮背景幾何圖形 */
+        .bg-shape {
+            position: fixed;
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatShape 18s infinite ease-in-out;
+        }
+        @keyframes floatShape {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(15deg); }
+        }
+
+        /* 彈跳動畫 */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.55);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white flex flex-col justify-between relative">
+
+    <!-- 背景幾何裝飾 -->
+    <div class="bg-shape text-9xl top-10 left-10"><i class="fa-solid fa-play -rotate-90"></i></div>
+    <div class="bg-shape text-9xl bottom-12 right-12" style="animation-delay: -5s;"><i class="fa-solid fa-square rotate-45"></i></div>
+    <div class="bg-shape text-8xl top-1/3 right-16" style="animation-delay: -9s;"><i class="fa-solid fa-circle"></i></div>
+    <div class="bg-shape text-8xl bottom-1/4 left-20" style="animation-delay: -13s;"><i class="fa-solid fa-square"></i></div>
+
+    <!-- 頂部導覽列 -->
+    <header class="relative z-20 bg-black/25 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-white/10">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="confirmReturnHome()">
+            <div class="bg-white text-[#46178f] font-black text-xl md:text-2xl px-3 py-1 rounded-xl shadow-md tracking-tight flex items-center gap-1.5">
+                <i class="fa-solid fa-shapes text-amber-500"></i>
+                <span>LTMPS Kahoot!</span>
+            </div>
+            <span class="hidden sm:inline-block text-xs md:text-sm font-bold bg-purple-800/80 border border-purple-400/30 px-2.5 py-1 rounded-full text-purple-100">
+                小四數學互動競答平台
+            </span>
+        </div>
+
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- 連線狀態指示 -->
+            <div id="connectionBadge" class="flex items-center gap-1.5 text-xs bg-emerald-900/70 border border-emerald-400/40 px-2.5 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="hidden md:inline">即時連線中</span>
+            </div>
+
+            <!-- 音效開關 -->
+            <button id="soundToggleBtn" onclick="toggleSound()" class="bg-white/15 hover:bg-white/25 active:scale-95 transition px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5" title="開關音效">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-amber-300"></i>
+                <span id="soundText" class="hidden sm:inline">音效開</span>
+            </button>
+
+            <!-- 返回主頁按鈕 -->
+            <button id="leaveBtn" onclick="confirmReturnHome()" class="hidden bg-rose-600 hover:bg-rose-500 active:scale-95 transition px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>離開房間</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="relative z-10 flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-6xl mx-auto">
+
+        <!-- ==================== VIEW 1: 主頁面 (HOME) ==================== -->
+        <section id="view-home" class="w-full max-w-4xl animate-pop">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center gap-2 bg-amber-400 text-purple-950 font-black px-4 py-1 rounded-full text-sm mb-3 shadow-md">
+                    <i class="fa-solid fa-bolt"></i> LTMPS Kahoot! 四年級數學即時競答比賽
+                </div>
+                <h1 class="text-4xl sm:text-6xl font-black tracking-tight drop-shadow-[0_4px_0_rgba(0,0,0,0.4)] mb-2">
+                    LTMPS Kahoot! 數學大挑戰
+                </h1>
+                <p class="text-purple-200 text-base sm:text-lg font-medium">
+                    輸入 1 至 2 位數房號即可火速參戰！愈快答對，分數愈高！
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                <!-- 左側：學生加入房間 -->
+                <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="bg-blue-100 text-blue-800 font-black px-3 py-1 rounded-lg text-sm">學生參賽入口</span>
+                            <i class="fa-solid fa-gamepad text-3xl text-blue-600"></i>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-black mb-2 text-gray-900">加入房間</h2>
+                        <p class="text-gray-500 text-sm mb-6">請輸入老師螢幕上顯示的房號 (1 - 99)</p>
+
+                        <div class="mb-4">
+                            <input id="joinPinInput" type="number" min="1" max="999" placeholder="輸入房號 (如: 8)"
+                                class="w-full text-center text-3xl sm:text-4xl font-black py-4 px-4 rounded-2xl border-4 border-gray-300 focus:border-purple-600 focus:outline-none bg-gray-50 text-gray-900 tracking-widest transition"
+                                onkeydown="if(event.key==='Enter') handleCheckRoomPin()">
+                        </div>
+                    </div>
+
+                    <button onclick="handleCheckRoomPin()" class="w-full btn-3d-dark text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <span>進入房間</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- 右側：老師創建房間 -->
+                <div class="bg-gradient-to-br from-purple-700 to-indigo-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-indigo-950 flex flex-col justify-between relative overflow-hidden">
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="bg-amber-400 text-purple-950 font-black px-3 py-1 rounded-lg text-sm">老師主持入口</span>
+                            <i class="fa-solid fa-chalkboard-user text-3xl text-amber-300"></i>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-black mb-2">創建比賽房間</h2>
+                        <p class="text-purple-200 text-sm mb-6">自訂題目數量、每題限時及考核單元，在大螢幕投影主持比賽！</p>
+
+                        <ul class="space-y-2 text-sm text-purple-100 mb-6 font-medium">
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 自動分配極短房號 (1-2位數字)</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 涵蓋倍數、因數、質數、乘除法及四邊形共6大單元</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-check-circle text-emerald-400"></i> 高誘導性選擇題誘答設計、即時詳解與排行榜</li>
+                        </ul>
+                    </div>
+
+                    <button onclick="showView('view-host-setup')" class="relative z-10 w-full bg-amber-400 hover:bg-amber-300 text-purple-950 text-xl font-black py-4 rounded-2xl shadow-[0_6px_0_#b45309] active:translate-y-1 active:shadow-[0_2px_0_#b45309] transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i>
+                        <span>創建新房間</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 2: 老師創建房間設定 (HOST SETUP) ==================== -->
+        <section id="view-host-setup" class="hidden w-full max-w-4xl animate-pop">
+            <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300">
+                <div class="flex items-center justify-between border-b pb-4 mb-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl font-black">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-black text-gray-900">房間與題目設定</h2>
+                            <p class="text-xs sm:text-sm text-gray-500">系統將根據所選單元隨機生成高誘導性題目（不包括公因數與公倍數）</p>
+                        </div>
+                    </div>
+                    <button onclick="showView('view-home')" class="text-gray-400 hover:text-gray-700 p-2 text-xl">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- 1. 挑選單元 -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                            1. 挑選考核單元（可多選）
+                        </label>
+                        <div class="flex gap-2 text-xs">
+                            <button type="button" onclick="toggleAllTopics(true)" class="text-purple-700 font-bold hover:underline">全選</button>
+                            <span class="text-gray-300">|</span>
+                            <button type="button" onclick="toggleAllTopics(false)" class="text-gray-500 font-bold hover:underline">全部取消</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-multiples" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">倍數</div>
+                                <div class="text-xs text-gray-500 mt-0.5">第N個倍數、判斷倍數、上下一個倍數</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-factors" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">因數</div>
+                                <div class="text-xs text-gray-500 mt-0.5">判斷因數、因數與倍數關係、因數數量</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-primes" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">質數及合成數</div>
+                                <div class="text-xs text-gray-500 mt-0.5">分辨100以內的質數與合成數</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-multiplication" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">乘法</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩位×兩位、三位×兩位、乘法應用題</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-division" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">除法及餘數處理</div>
+                                <div class="text-xs text-gray-500 mt-0.5">兩/三位÷兩位、最多可/最少要/餘下裝袋/還欠多少</div>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer border-2 border-purple-500 bg-purple-50/60 rounded-2xl p-3.5 flex items-start gap-3 transition hover:shadow-md">
+                            <input type="checkbox" id="topic-quadrilaterals" checked class="mt-1 w-5 h-5 accent-purple-700 rounded">
+                            <div>
+                                <div class="font-black text-gray-900">四邊形特性與從屬</div>
+                                <div class="text-xs text-gray-500 mt-0.5">正方形、長方形、菱形、平行四邊形、梯形</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 2. 題目數目 & 3. 每題作答時間 (支援快速按鈕 + 手動輸入自訂) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                                2. 題目數目 (可手動輸入)
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <input id="customQCountInput" type="number" min="1" max="50" value="10"
+                                    oninput="handleCustomInput('qCount', this.value)"
+                                    class="w-20 text-center font-black text-lg py-1 px-2 rounded-xl border-2 border-purple-500 bg-purple-50 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                <span class="text-xs font-black text-gray-600">題</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2" id="qCountSelector">
+                            <button type="button" onclick="selectOption('qCount', 5)" data-val="5" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">5 題</button>
+                            <button type="button" onclick="selectOption('qCount', 10)" data-val="10" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-sm">10 題</button>
+                            <button type="button" onclick="selectOption('qCount', 15)" data-val="15" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">15 題</button>
+                            <button type="button" onclick="selectOption('qCount', 20)" data-val="20" class="qcount-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">20 題</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-black text-gray-700 uppercase tracking-wider">
+                                3. 每題作答時間 (可手動輸入)
+                            </label>
+                            <div class="flex items-center gap-1.5">
+                                <input id="customTimeLimitInput" type="number" min="5" max="300" value="20"
+                                    oninput="handleCustomInput('timeLimit', this.value)"
+                                    class="w-20 text-center font-black text-lg py-1 px-2 rounded-xl border-2 border-purple-500 bg-purple-50 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400">
+                                <span class="text-xs font-black text-gray-600">秒</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5" id="timeLimitSelector">
+                            <button type="button" onclick="selectOption('timeLimit', 15)" data-val="15" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">15秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 20)" data-val="20" class="time-btn py-2.5 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-xs sm:text-sm">20秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 30)" data-val="30" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">30秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 45)" data-val="45" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">45秒</button>
+                            <button type="button" onclick="selectOption('timeLimit', 60)" data-val="60" class="time-btn py-2.5 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">60秒</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 出題形式 -->
+                <div class="mb-8">
+                    <label class="block text-sm font-black text-gray-700 uppercase tracking-wider mb-2">
+                        4. 作答模式
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button type="button" onclick="selectOption('qFormat', 'mixed')" data-val="mixed" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-purple-600 bg-purple-600 text-white text-sm">
+                            <i class="fa-solid fa-shuffle mr-1"></i> 選擇題 + 填充題混合
+                        </button>
+                        <button type="button" onclick="selectOption('qFormat', 'mc')" data-val="mc" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">
+                            <i class="fa-solid fa-table-cells-large mr-1"></i> 全部選擇題
+                        </button>
+                        <button type="button" onclick="selectOption('qFormat', 'fill')" data-val="fill" class="format-btn py-3 px-4 rounded-xl font-black border-2 border-gray-200 text-gray-700 hover:bg-gray-100 text-sm">
+                            <i class="fa-solid fa-keyboard mr-1"></i> 優先填充題
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="showView('view-home')" class="w-1/3 py-4 rounded-2xl font-black text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                        返回
+                    </button>
+                    <button id="createRoomSubmitBtn" onclick="handleCreateRoom()" class="w-2/3 btn-3d-purple text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rocket"></i>
+                        <span>立即開啟房間</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 3: 學生填寫學號與姓名 (STUDENT PROFILE) ==================== -->
+        <section id="view-student-profile" class="hidden w-full max-w-md animate-pop">
+            <div class="bg-white text-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300">
+                <div class="text-center mb-6">
+                    <span class="inline-block bg-purple-100 text-purple-800 font-black px-4 py-1 rounded-full text-sm mb-2">
+                        房號：<span id="studentJoinPinDisplay" class="text-lg">8</span>
+                    </span>
+                    <h2 class="text-2xl sm:text-3xl font-black text-gray-900">輸入參賽資料</h2>
+                    <p class="text-gray-500 text-sm">請選擇你的學號並輸入姓名</p>
+                </div>
+
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-black text-gray-700 mb-1.5">選擇學號</label>
+                        <select id="studentClassNo" class="w-full text-xl font-black py-3.5 px-4 rounded-2xl border-3 border-gray-300 bg-gray-50 text-gray-900 focus:border-purple-600 focus:outline-none">
+                            <!-- 由 JS 生成 1 - 40 號 -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-black text-gray-700 mb-1.5">輸入姓名</label>
+                        <input id="studentNameInput" type="text" maxlength="12" placeholder="例如：陳小明"
+                            class="w-full text-xl font-black py-3.5 px-4 rounded-2xl border-3 border-gray-300 bg-gray-50 text-gray-900 focus:border-purple-600 focus:outline-none"
+                            onkeydown="if(event.key==='Enter') handleStudentJoinLobby()">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="showView('view-home')" class="w-1/3 py-4 rounded-2xl font-black text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                        返回
+                    </button>
+                    <button onclick="handleStudentJoinLobby()" class="w-2/3 kahoot-green text-white text-xl font-black py-4 rounded-2xl flex items-center justify-center gap-2">
+                        <span>加入比賽！</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 4: 等候大廳 (LOBBY - 老師與學生共用架構) ==================== -->
+        <section id="view-lobby" class="hidden w-full animate-pop">
+            <!-- 頂部超大房號橫幅 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-8 shadow-2xl border-b-8 border-gray-300 mb-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="text-center md:text-left">
+                    <div class="text-sm sm:text-base font-black text-purple-700 uppercase tracking-wider mb-1">
+                        請學生進入本網頁並輸入房號：
+                    </div>
+                    <div class="flex items-center justify-center md:justify-start gap-4">
+                        <div id="lobbyPinNumber" class="text-6xl sm:text-8xl font-black tracking-tighter text-gray-900 bg-amber-300 px-6 py-2 rounded-3xl shadow-inner border-4 border-amber-400">
+                            --
+                        </div>
+                        <div class="text-left space-y-1">
+                            <div id="lobbyConfigSummary" class="text-xs sm:text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                                10 題 · 每題 20 秒
+                            </div>
+                            <div id="lobbyTopicsSummary" class="text-xs font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-xl">
+                                單元：倍數、因數、質數及合成數
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 老師端顯示「開始比賽」按鈕；學生端顯示等候提示 -->
+                <div id="hostLobbyActions" class="hidden flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <button onclick="handleRegenerateQuestions()" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-800 font-black px-4 py-4 rounded-2xl text-sm transition flex items-center justify-center gap-1.5" title="重新抽題">
+                        <i class="fa-solid fa-rotate"></i> 重新抽題
+                    </button>
+                    <button id="startGameBtn" onclick="hostStartGame()" class="w-full sm:w-auto kahoot-green text-white text-2xl font-black px-8 py-4 rounded-2xl flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-play"></i>
+                        <span>開始比賽</span>
+                    </button>
+                </div>
+
+                <div id="studentLobbyBadge" class="hidden bg-emerald-50 border-2 border-emerald-500 text-emerald-900 px-6 py-4 rounded-2xl text-center">
+                    <div class="text-xs font-bold uppercase tracking-wider text-emerald-700">你已成功加入</div>
+                    <div id="studentSelfTag" class="text-2xl font-black mt-0.5">[1號] 陳小明</div>
+                    <div class="text-xs text-emerald-600 mt-1 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-spinner fa-spin"></i> 等待老師按「開始比賽」...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 已加入學生列表 -->
+            <div class="bg-black/25 backdrop-blur-md rounded-3xl p-6 border border-white/15">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2 text-lg sm:text-xl font-black">
+                        <i class="fa-solid fa-users text-amber-300"></i>
+                        <span>已加入學生 (<span id="lobbyPlayerCount">0</span> 人)</span>
+                    </div>
+                    <span id="hostKickHint" class="hidden text-xs text-purple-200">
+                        <i class="fa-solid fa-hand-pointer mr-1"></i>老師點擊學生名牌可將其移出房間
+                    </span>
+                </div>
+
+                <div id="lobbyPlayersGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 min-h-[120px] content-start">
+                    <!-- 動態生成學生卡片 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 5: 題目作答畫面 (QUESTION PHASE) ==================== -->
+        <section id="view-question" class="hidden w-full flex-1 flex flex-col justify-between animate-pop">
+            <!-- 頂部狀態列：題號、倒數進度條、已答人數 -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2 gap-2">
+                    <div class="flex items-center gap-2">
+                        <span id="qProgressBadge" class="bg-white text-purple-950 font-black px-3.5 py-1 rounded-full text-sm sm:text-base shadow">
+                            第 1 / 10 題
+                        </span>
+                        <span id="qTopicBadge" class="bg-purple-800/90 border border-purple-400/30 text-purple-100 font-bold px-3 py-1 rounded-full text-xs sm:text-sm">
+                            倍數
+                        </span>
+                    </div>
+
+                    <!-- 學生端顯示自己分數與連續答對 -->
+                    <div id="studentScoreHeader" class="hidden items-center gap-2">
+                        <span id="studentStreakBadge" class="hidden bg-orange-500 text-white font-black px-3 py-1 rounded-full text-xs sm:text-sm shadow items-center gap-1">
+                            <i class="fa-solid fa-fire"></i> <span id="studentStreakCount">2</span> 連勝
+                        </span>
+                        <span class="bg-black/40 border border-white/20 px-3.5 py-1 rounded-full text-sm font-black">
+                            總分：<span id="studentCurrentScore" class="text-amber-300">0</span>
+                        </span>
+                    </div>
+
+                    <!-- 老師端顯示作答人數與提前結算按鈕 -->
+                    <div id="hostQuestionControls" class="hidden items-center gap-3">
+                        <div class="bg-black/40 border border-white/20 px-4 py-1 rounded-full text-sm font-black">
+                            已作答：<span id="hostAnsweredCount" class="text-amber-300 text-base">0 / 0</span>
+                        </div>
+                        <button onclick="hostEndQuestionNow()" class="bg-amber-400 hover:bg-amber-300 text-purple-950 font-black px-3.5 py-1 rounded-full text-xs sm:text-sm shadow active:scale-95 transition">
+                            立即揭曉 <i class="fa-solid fa-forward-step ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 動態時間條 -->
+                <div class="w-full bg-black/40 h-4 rounded-full overflow-hidden p-0.5 border border-white/15">
+                    <div id="timerBar" class="bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 h-full rounded-full transition-all duration-200" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- 中央：題目白板與倒數秒數球 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-6 sm:p-10 shadow-2xl border-b-8 border-gray-300 my-auto relative flex flex-col items-center justify-center min-h-[180px] sm:min-h-[230px]">
+                <!-- 倒數計時圓圈 -->
+                <div class=" -mt-12 sm:-mt-14 mb-3 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-purple-800 border-4 border-white shadow-xl flex items-center justify-center text-white font-black text-2xl sm:text-3xl" id="timerCircle">
+                    20
+                </div>
+
+                <!-- 題目文字 -->
+                <h2 id="questionText" class="text-2xl sm:text-4xl md:text-5xl font-black text-center leading-snug tracking-tight text-gray-900">
+                    8 的第 3 個倍數是 _____
+                </h2>
+
+                <p id="questionSubHint" class="text-xs sm:text-sm font-bold text-gray-400 mt-3">
+                    愈快答對，獲得的時間獎勵分數愈高！
+                </p>
+            </div>
+
+            <!-- 底部：作答區（選擇題 4 色按鈕 / 填充題數字鍵盤 / 已作答等候遮罩） -->
+            <div class="mt-6">
+                <!-- 模式 A：選擇題 4 個按鈕 -->
+                <div id="mcAnswerArea" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <button onclick="submitStudentAnswer(0)" id="mc-btn-0" class="kahoot-red text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-play -rotate-90"></i>
+                        </div>
+                        <span id="mc-text-0" class="text-xl sm:text-3xl font-black break-all">24</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(1)" id="mc-btn-1" class="kahoot-blue text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-square rotate-45"></i>
+                        </div>
+                        <span id="mc-text-1" class="text-xl sm:text-3xl font-black break-all">16</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(2)" id="mc-btn-2" class="kahoot-yellow text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-circle"></i>
+                        </div>
+                        <span id="mc-text-2" class="text-xl sm:text-3xl font-black break-all">32</span>
+                    </button>
+
+                    <button onclick="submitStudentAnswer(3)" id="mc-btn-3" class="kahoot-green text-white rounded-2xl p-4 sm:p-6 flex items-center gap-4 text-left">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-black/20 flex items-center justify-center text-xl sm:text-2xl shrink-0">
+                            <i class="fa-solid fa-square"></i>
+                        </div>
+                        <span id="mc-text-3" class="text-xl sm:text-3xl font-black break-all">11</span>
+                    </button>
+                </div>
+
+                <!-- 模式 B：填充題輸入與數字鍵盤 -->
+                <div id="fillAnswerArea" class="hidden max-w-md mx-auto bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/20">
+                    <!-- 學生輸入框與虛擬數字鍵盤 -->
+                    <div id="studentFillControls">
+                        <div class="flex gap-2 mb-3">
+                            <input id="fillInputBox" type="number" inputmode="numeric" placeholder="輸入數字答案"
+                                class="w-full text-center text-3xl font-black py-3 px-4 rounded-2xl bg-white text-gray-900 border-4 border-purple-300 focus:border-amber-400 focus:outline-none"
+                                onkeydown="if(event.key==='Enter') submitFillAnswer()">
+                            <button onclick="submitFillAnswer()" class="kahoot-green text-white font-black px-6 rounded-2xl text-lg shrink-0">
+                                提交
+                            </button>
+                        </div>
+                        <!-- 方便 iPad / 手機點擊的快速數字鍵盤 -->
+                        <div class="grid grid-cols-6 gap-1.5">
+                            <button type="button" onclick="appendFillDigit('1')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">1</button>
+                            <button type="button" onclick="appendFillDigit('2')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">2</button>
+                            <button type="button" onclick="appendFillDigit('3')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">3</button>
+                            <button type="button" onclick="appendFillDigit('4')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">4</button>
+                            <button type="button" onclick="appendFillDigit('5')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">5</button>
+                            <button type="button" onclick="clearFillInput()" class="bg-rose-500/80 hover:bg-rose-500 active:scale-95 py-2.5 rounded-xl font-black text-sm">清除</button>
+                            <button type="button" onclick="appendFillDigit('6')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">6</button>
+                            <button type="button" onclick="appendFillDigit('7')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">7</button>
+                            <button type="button" onclick="appendFillDigit('8')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">8</button>
+                            <button type="button" onclick="appendFillDigit('9')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">9</button>
+                            <button type="button" onclick="appendFillDigit('0')" class="bg-white/20 hover:bg-white/30 active:scale-95 py-2.5 rounded-xl font-black text-lg">0</button>
+                            <button type="button" onclick="backspaceFillInput()" class="bg-amber-500/80 hover:bg-amber-500 active:scale-95 py-2.5 rounded-xl font-black text-sm"><i class="fa-solid fa-delete-left"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- 老師端填充題提示 -->
+                    <div id="hostFillNotice" class="hidden text-center py-4">
+                        <div class="text-xl font-black text-amber-300"><i class="fa-solid fa-keyboard mr-2"></i>此題為填充題</div>
+                        <p class="text-sm text-purple-200 mt-1">學生正在裝置上輸入數字答案...</p>
+                    </div>
+                </div>
+
+                <!-- 學生已提交答案後的鎖定等待畫面 -->
+                <div id="studentSubmittedWait" class="hidden bg-indigo-950/90 border-2 border-indigo-400/40 rounded-3xl p-6 text-center shadow-xl">
+                    <div class="w-14 h-14 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center text-2xl font-black mx-auto mb-3 animate-bounce">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <h3 class="text-2xl font-black">答案已送出！</h3>
+                    <p id="studentSubmittedChoiceText" class="text-purple-200 text-sm mt-1">你的作答：24</p>
+                    <p class="text-xs text-amber-300 mt-3 font-bold">請等待所有同學完成作答，即將公佈答案與排行榜...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 6: 每題結果與即時排行榜 (RESULT & LEADERBOARD) ==================== -->
+        <section id="view-leaderboard" class="hidden w-full max-w-4xl animate-pop">
+            <!-- 學生個人本題結果橫幅 -->
+            <div id="studentRoundFeedback" class="hidden mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div id="feedbackIconBox" class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-3xl font-black">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div>
+                        <h3 id="feedbackTitle" class="text-2xl font-black">答對了！太棒了！</h3>
+                        <p id="feedbackSub" class="text-sm opacity-90">反應神速！目前排在第 1 名</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="feedbackDelta" class="text-3xl font-black bg-black/25 px-4 py-1.5 rounded-2xl">+890</div>
+                </div>
+            </div>
+
+            <!-- 正確答案與小四數學詳解卡 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-5 sm:p-6 shadow-2xl border-b-8 border-gray-300 mb-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+                    <div>
+                        <span id="reviewTopicTag" class="text-xs font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2.5 py-1 rounded-md">
+                            題目回顧
+                        </span>
+                        <h3 id="reviewQuestionText" class="text-lg sm:text-2xl font-black text-gray-800 mt-1">
+                            8 的第 3 個倍數是 _____
+                        </h3>
+                    </div>
+                    <div class="bg-emerald-100 border-2 border-emerald-500 text-emerald-900 px-5 py-2.5 rounded-2xl text-center shrink-0">
+                        <div class="text-xs font-bold text-emerald-700">正確答案</div>
+                        <div id="reviewCorrectAnswer" class="text-xl sm:text-2xl font-black">24</div>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <div class="text-gray-700 font-bold flex items-start gap-2">
+                        <i class="fa-solid fa-lightbulb text-amber-500 text-lg mt-0.5"></i>
+                        <span id="reviewExplanation">解說：8 × 3 = 24，所以 8 的第 3 個倍數是 24。</span>
+                    </div>
+                    <div id="reviewStatsBadge" class="text-xs font-black bg-gray-100 text-gray-700 px-3 py-1.5 rounded-xl shrink-0 self-start sm:self-center">
+                        本題答對率：0 / 0 人
+                    </div>
+                </div>
+            </div>
+
+            <!-- 即時積分排行榜及分數變化 -->
+            <div class="bg-black/30 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-white/15 shadow-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-trophy text-2xl text-amber-300"></i>
+                        <h3 class="text-xl sm:text-2xl font-black">即時排行榜 & 分數變化</h3>
+                    </div>
+
+                    <!-- 老師端「下一題 / 查看最終頒獎台」按鈕 -->
+                    <button id="hostNextQuestionBtn" onclick="hostNextQuestion()" class="hidden kahoot-blue text-white font-black px-6 py-3 rounded-2xl text-base sm:text-lg flex items-center gap-2">
+                        <span id="hostNextBtnText">下一題</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <div id="leaderboardList" class="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                    <!-- 動態生成排名列 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== VIEW 7: 最終頒獎台與總成績單 (PODIUM / FINAL) ==================== -->
+        <section id="view-podium" class="hidden w-full max-w-4xl animate-pop">
+            <div class="text-center mb-6">
+                <span class="bg-amber-400 text-purple-950 font-black px-4 py-1 rounded-full text-sm shadow">
+                    比賽圓滿結束！
+                </span>
+                <h2 class="text-3xl sm:text-5xl font-black mt-2 drop-shadow">
+                    <i class="fa-solid fa-crown text-amber-300 mr-2"></i>最終榮譽頒獎台
+                </h2>
+            </div>
+
+            <!-- 冠亞季軍頒獎台 -->
+            <div class="grid grid-cols-3 gap-2 sm:gap-4 items-end max-w-2xl mx-auto mb-8 pt-6 px-2">
+                <!-- 亞軍 (2nd) -->
+                <div id="podium-2" class="flex flex-col items-center">
+                    <div class="text-center mb-2">
+                        <div id="podium2-name" class="font-black text-sm sm:text-lg truncate max-w-[110px] sm:max-w-[160px]">---</div>
+                        <div id="podium2-score" class="text-xs sm:text-sm text-purple-200 font-bold">0 分</div>
+                    </div>
+                    <div class="w-full h-28 sm:h-36 bg-gradient-to-t from-slate-400 to-slate-200 text-slate-900 rounded-t-2xl shadow-xl flex flex-col items-center justify-start pt-3 border-t-4 border-white">
+                        <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-slate-700 text-white flex items-center justify-center font-black text-lg sm:text-xl shadow">2</div>
+                        <span class="text-xs font-black mt-1 uppercase opacity-75">亞軍</span>
+                    </div>
+                </div>
+
+                <!-- 冠軍 (1st) -->
+                <div id="podium-1" class="flex flex-col items-center">
+                    <div class="text-amber-300 text-3xl mb-1 animate-bounce"><i class="fa-solid fa-crown"></i></div>
+                    <div class="text-center mb-2">
+                        <div id="podium1-name" class="font-black text-base sm:text-xl text-amber-300 truncate max-w-[120px] sm:max-w-[180px]">---</div>
+                        <div id="podium1-score" class="text-xs sm:text-base text-white font-black">0 分</div>
+                    </div>
+                    <div class="w-full h-36 sm:h-48 bg-gradient-to-t from-amber-500 to-amber-300 text-purple-950 rounded-t-2xl shadow-2xl flex flex-col items-center justify-start pt-4 border-t-4 border-yellow-100">
+                        <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-purple-950 text-amber-300 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-lg">1</div>
+                        <span class="text-xs sm:text-sm font-black mt-1 uppercase">總冠軍</span>
+                    </div>
+                </div>
+
+                <!-- 季軍 (3rd) -->
+                <div id="podium-3" class="flex flex-col items-center">
+                    <div class="text-center mb-2">
+                        <div id="podium3-name" class="font-black text-sm sm:text-lg truncate max-w-[110px] sm:max-w-[160px]">---</div>
+                        <div id="podium3-score" class="text-xs sm:text-sm text-purple-200 font-bold">0 分</div>
+                    </div>
+                    <div class="w-full h-20 sm:h-28 bg-gradient-to-t from-amber-800 to-amber-600 text-white rounded-t-2xl shadow-xl flex flex-col items-center justify-start pt-2.5 border-t-4 border-amber-400">
+                        <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-amber-950 text-amber-200 flex items-center justify-center font-black text-base sm:text-lg shadow">3</div>
+                        <span class="text-xs font-black mt-1 uppercase opacity-80">季軍</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全班完整成績單 -->
+            <div class="bg-white text-gray-900 rounded-3xl p-5 sm:p-6 shadow-2xl border-b-8 border-gray-300">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b pb-3">
+                    <h3 class="text-xl font-black flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-list text-purple-700"></i>
+                        <span>全班總成績表</span>
+                    </h3>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="exportScoresCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-file-csv"></i> 匯出 CSV 成績
+                        </button>
+                        <button id="hostPlayAgainBtn" onclick="hostRestartLobby()" class="hidden bg-purple-700 hover:bg-purple-600 text-white font-bold px-4 py-2 rounded-xl text-sm items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-rotate-right"></i> 原房再玩一局
+                        </button>
+                        <button onclick="confirmReturnHome()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold px-4 py-2 rounded-xl text-sm transition">
+                            返回主頁
+                        </button>
+                    </div>
+                </div>
+
+                <div id="finalScoreTable" class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    <!-- 動態生成全班最終名次 -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 底部版權與提示列 -->
+    <footer class="relative z-10 text-center py-3 text-xs text-purple-200/70">
+        LTMPS Kahoot! · 香港小學四年級數學科互動競賽系統
+    </footer>
+
+    <!-- 自訂彈出提示框 (取代原生 alert / confirm) -->
+    <div id="customModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white text-gray-900 rounded-3xl max-w-sm w-full p-6 shadow-2xl border-b-8 border-gray-300 animate-pop text-center">
+            <div id="modalIcon" class="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-3">
+                <i class="fa-solid fa-circle-Exclamation"></i>
+            </div>
+            <h3 id="modalTitle" class="text-xl font-black mb-2">提示</h3>
+            <p id="modalMessage" class="text-gray-600 text-sm mb-6">訊息內容</p>
+            <div id="modalButtons" class="flex gap-3 justify-center">
+                <button id="modalCancelBtn" class="hidden flex-1 py-3 rounded-xl font-black bg-gray-100 hover:bg-gray-200 text-gray-700">取消</button>
+                <button id="modalConfirmBtn" class="flex-1 py-3 rounded-xl font-black bg-purple-700 hover:bg-purple-600 text-white">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**************************************************************
+         * 5. 小四數學題庫生成器 (涵蓋6大單元 + 高誘導性選擇題誘答)
+         *    1. 倍數  2. 因數  3. 質數及合成數
+         *    4. 乘法  5. 除法及餘數處理  6. 四邊形的特性及從屬關係 (不含鷂形)
+         **************************************************************/
+        const PRIMES_UNDER_100 = [
+            2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
+            31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+            73, 79, 83, 89, 97
+        ];
+
+        // 學生極易誤判為質數的「奇合成數」陷阱庫
+        const TRICKY_ODD_COMPOSITES = [9, 15, 21, 25, 27, 33, 35, 39, 45, 49, 51, 55, 57, 63, 65, 69, 75, 77, 81, 85, 87, 91, 93, 95, 99];
+
+        const COMPOSITES_UNDER_100 = [];
+        for (let n = 4; n <= 99; n++) {
+            if (!PRIMES_UNDER_100.includes(n)) COMPOSITES_UNDER_100.push(n);
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function shuffleArray(arr) {
+            const copy = [...arr];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
+
+        function getFactors(n) {
+            const list = [];
+            for (let i = 1; i <= n; i++) {
+                if (n % i === 0) list.push(i);
+            }
+            return list;
+        }
+
+        // 根據指定優先誘答陣列組裝 4 個不重複選項
+        function buildTrapOptions(correctVal, preferredTraps, validatorFn = null) {
+            const correctStr = String(correctVal);
+            const chosen = new Set([correctStr]);
+
+            for (const t of preferredTraps) {
+                if (chosen.size >= 4) break;
+                const s = String(t);
+                if (Number(t) > 0 && s !== correctStr && (!validatorFn || !validatorFn(Number(t)))) {
+                    chosen.add(s);
+                }
+            }
+
+            const offsets = [-10, 10, -2, 2, -1, 1, -4, 4, -6, 6, -8, 8, 12, -12, 3, -3, 5, -5];
+            for (const off of shuffleArray(offsets)) {
+                if (chosen.size >= 4) break;
+                const cand = Number(correctVal) + off;
+                if (cand > 0 && String(cand) !== correctStr && (!validatorFn || !validatorFn(cand))) {
+                    chosen.add(String(cand));
+                }
+            }
+
+            let fallback = 2;
+            while (chosen.size < 4) {
+                if (String(fallback) !== correctStr && (!validatorFn || !validatorFn(fallback))) {
+                    chosen.add(String(fallback));
+                }
+                fallback++;
+            }
+
+            return shuffleArray(Array.from(chosen));
+        }
+
+        // 決定某道可選填題目要用 MC 還是 Fill
+        function resolveFormat(canBeFill, preferredMode) {
+            if (!canBeFill) return 'mc';
+            if (preferredMode === 'mc') return 'mc';
+            if (preferredMode === 'fill') return 'fill';
+            return Math.random() < 0.45 ? 'fill' : 'mc';
+        }
+
+        // 四邊形題庫生成（已完全移除「鷂形」所有題目及答案選項）
+        function generateQuadrilateralQuestion() {
+            const quadBank = [
+                {
+                    prompt: '以下哪一種四邊形「只有一組對邊平行」？',
+                    answer: '梯形',
+                    options: ['梯形', '平行四邊形', '長方形', '菱形'],
+                    explanation: '梯形的特性是「只有一組對邊平行」；而平行四邊形、長方形、菱形和正方形都有兩組對邊平行。'
+                },
+                {
+                    prompt: '以下哪一種四邊形必定具有「四邊長度相等」和「四個直角」？',
+                    answer: '正方形',
+                    options: ['正方形', '長方形', '菱形', '平行四邊形'],
+                    explanation: '正方形同時具備四邊相等及四個直角；菱形四邊相等但不一定有直角，長方形有四個直角但鄰邊不一定相等。'
+                },
+                {
+                    prompt: '某四邊形的四條邊長度相等，兩組對邊分別平行，但沒有直角。它是甚麼圖形？',
+                    answer: '菱形',
+                    options: ['菱形', '正方形', '長方形', '梯形'],
+                    explanation: '菱形的四條邊長度相等且兩組對邊平行，但四角不一定是直角。'
+                },
+                {
+                    prompt: '某四邊形有兩組對邊分別平行，且有四個直角，但四條邊不全部相等。它是甚麼圖形？',
+                    answer: '長方形',
+                    options: ['長方形', '正方形', '菱形', '平行四邊形'],
+                    explanation: '長方形有四個直角和兩組對邊平行且相等，鄰邊長度可以不同。'
+                },
+                {
+                    prompt: '一個梯形如果其中有兩個角是直角，我們稱它為甚麼？',
+                    answer: '直角梯形',
+                    options: ['直角梯形', '長方形', '平行四邊形', '正方形'],
+                    explanation: '只有一組對邊平行且有直角的梯形稱為「直角梯形」。'
+                },
+                {
+                    prompt: '關於四邊形的從屬關係，以下哪一項描述是「正確」的？',
+                    answer: '所有正方形都是長方形',
+                    options: [
+                        '所有正方形都是長方形',
+                        '所有長方形都是正方形',
+                        '所有平行四邊形都是長方形',
+                        '所有梯形都是平行四邊形'
+                    ],
+                    explanation: '長方形的定義是有四個直角的平行四邊形，正方形符合此條件，所以「所有正方形都是長方形」（同時也是菱形）。'
+                },
+                {
+                    prompt: '關於四邊形的從屬關係，以下哪一項描述是「正確」的？',
+                    answer: '所有正方形都是菱形',
+                    options: [
+                        '所有正方形都是菱形',
+                        '所有菱形都是正方形',
+                        '所有平行四邊形都是菱形',
+                        '所有長方形都是菱形'
+                    ],
+                    explanation: '菱形的定義是四邊相等的四邊形，正方形四邊相等，因此所有正方形都屬於菱形。'
+                },
+                {
+                    prompt: '關於四邊形的從屬關係，以下哪一項描述是「正確」的？',
+                    answer: '所有長方形和菱形都是平行四邊形',
+                    options: [
+                        '所有長方形和菱形都是平行四邊形',
+                        '所有平行四邊形都是長方形',
+                        '所有梯形都是平行四邊形',
+                        '所有菱形都是長方形'
+                    ],
+                    explanation: '長方形和菱形都有「兩組對邊分別平行」，因此它們都屬於平行四邊形家族。'
+                },
+                {
+                    prompt: '關於四邊形的從屬關係，以下哪一項描述是「錯誤」的？',
+                    answer: '所有長方形都是正方形',
+                    options: [
+                        '所有長方形都是正方形',
+                        '所有正方形都是長方形',
+                        '所有正方形都是平行四邊形',
+                        '所有菱形都是平行四邊形'
+                    ],
+                    explanation: '長方形的四條邊不一定全部一樣長，所以長方形不一定是正方形；反之所有正方形都是長方形。'
+                },
+                {
+                    prompt: '關於四邊形的從屬關係，以下哪一項描述是「錯誤」的？',
+                    answer: '所有菱形都是正方形',
+                    options: [
+                        '所有菱形都是正方形',
+                        '所有正方形都是菱形',
+                        '所有長方形都是平行四邊形',
+                        '所有正方形都是平行四邊形'
+                    ],
+                    explanation: '菱形不一定有四個直角，所以不是所有菱形都是正方形。'
+                },
+                {
+                    prompt: '「正方形」同時屬於以下哪兩個圖形家族？',
+                    answer: '長方形和菱形',
+                    options: [
+                        '長方形和菱形',
+                        '長方形和梯形',
+                        '菱形和梯形',
+                        '平行四邊形和梯形'
+                    ],
+                    explanation: '正方形有四個直角（屬於長方形）且四邊相等（屬於菱形），所以同時是長方形和菱形。'
+                },
+                {
+                    prompt: '以下哪一種四邊形「不屬於」平行四邊形家族？',
+                    answer: '梯形',
+                    options: ['梯形', '長方形', '菱形', '正方形'],
+                    explanation: '平行四邊形必須有兩組對邊平行，而梯形只有一組對邊平行，所以梯形不屬於平行四邊形。'
+                },
+                {
+                    prompt: '平行四邊形必定具有以下哪一項特性？',
+                    answer: '兩組對邊長度分別相等',
+                    options: [
+                        '兩組對邊長度分別相等',
+                        '四條邊長度相等',
+                        '四個角都是直角',
+                        '只有一組對邊平行'
+                    ],
+                    explanation: '平行四邊形的兩組對邊分別平行，而且兩組對邊的長度分別相等、兩組對角分別相等。'
+                },
+                {
+                    prompt: '長方形和菱形都必定共同擁有以下哪一項特性？',
+                    answer: '兩組對邊分別平行',
+                    options: [
+                        '兩組對邊分別平行',
+                        '四個角都是直角',
+                        '四條邊長度全部相等',
+                        '只有一組對邊平行'
+                    ],
+                    explanation: '長方形和菱形都屬於平行四邊形，所以它們都有「兩組對邊分別平行」及「對邊長度相等」的特性。'
+                }
+            ];
+
+            const picked = pickRandom(quadBank);
+            return {
+                topic: '四邊形的特性及從屬關係',
+                format: 'mc',
+                prompt: picked.prompt,
+                answer: picked.answer,
+                options: shuffleArray(picked.options),
+                explanation: picked.explanation
+            };
+        }
+
+        function generateSingleQuestion(typeId, preferredMode) {
+            switch (typeId) {
+                // ==================== 單元 1：倍數 ====================
+                // 題型 1: 8的第3個倍數是_____ (誘答包含 A+B、因數或鄰近倍數)
+                case 1: {
+                    const A = randInt(3, 16);
+                    const B = randInt(2, 12);
+                    const ans = A * B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const factorsOfA = getFactors(A).filter(f => f > 1 && f < A);
+                    const trapFactor = factorsOfA.length > 0 ? pickRandom(factorsOfA) : A + B;
+                    const traps = [
+                        A * (B - 1),
+                        A * (B + 1),
+                        A + B,
+                        trapFactor,
+                        ans + 10,
+                        ans - 2
+                    ];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '倍數',
+                        format: qFormat,
+                        prompt: `${A} 的第 ${B} 個倍數是 _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} × ${B} = ${ans}，所以 ${A} 的第 ${B} 個倍數是 ${ans}。`
+                    };
+                }
+
+                // 題型 2: 以下哪個是12的倍數? (高誘導性：誘答包含 12 的因數！)
+                case 2: {
+                    const compositePool = [8, 9, 10, 12, 14, 15, 16, 18, 20, 21, 24, 25, 27, 28, 30, 32, 36];
+                    const A = pickRandom(compositePool);
+                    const k = randInt(2, 6);
+                    const correct = A * k;
+
+                    // 取得 A 的真因數作為核心陷阱 (學生常混淆因數與倍數)
+                    const properFactors = shuffleArray(getFactors(A).filter(f => f > 1 && f < A));
+                    const traps = [];
+                    if (properFactors.length >= 2) {
+                        traps.push(properFactors[0], properFactors[1]);
+                    } else if (properFactors.length === 1) {
+                        traps.push(properFactors[0]);
+                    }
+                    // 加入「個位或十位含 A 的數字」或「差一點整除的數」
+                    traps.push(A * randInt(2, 5) + pickRandom([1, 2, -1, -2]));
+                    traps.push(A + 10);
+
+                    const options = buildTrapOptions(correct, traps, x => x % A === 0);
+                    return {
+                        topic: '倍數',
+                        format: 'mc',
+                        prompt: `以下哪個是 ${A} 的倍數？`,
+                        answer: String(correct),
+                        options,
+                        explanation: `${correct} ÷ ${A} = ${k}（整除），所以 ${correct} 是 ${A} 的倍數（注意不要誤選 ${A} 的因數！）。`
+                    };
+                }
+
+                // 題型 3: 12是以下哪個數的倍數? (高誘導性：誘答放入 12 的倍數如 24, 36！)
+                case 3: {
+                    const correctDivisor = randInt(3, 12);
+                    const k = randInt(2, 6);
+                    const A = correctDivisor * k;
+                    // 陷阱：學生看到「12」和「倍數」就直覺選 24、36 (其實 24 是 12 的倍數，12 是 24 的因數)
+                    const traps = [
+                        A * 2,
+                        A * 3,
+                        correctDivisor + 1,
+                        correctDivisor + 2,
+                        A - 2
+                    ];
+                    const options = buildTrapOptions(correctDivisor, traps, x => A % x === 0);
+                    return {
+                        topic: '倍數',
+                        format: 'mc',
+                        prompt: `${A} 是以下哪個數的倍數？`,
+                        answer: String(correctDivisor),
+                        options,
+                        explanation: `因為 ${correctDivisor} × ${k} = ${A}，所以 ${A} 是 ${correctDivisor} 的倍數（注意：${A * 2} 是 ${A} 的倍數，方向不要顛倒！）。`
+                    };
+                }
+
+                // 題型 4: 120是5的倍數，上一個倍數是?
+                case 4: {
+                    const A = randInt(4, 16);
+                    const k = randInt(4, 20);
+                    const M = A * k;
+                    const ans = M - A;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 陷阱：下一個倍數 M+A、直接減1 (M-1)、減錯商 (M-k)
+                    const traps = [M + A, M - 1, M - k, M - A + 1];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '倍數',
+                        format: qFormat,
+                        prompt: `${M} 是 ${A} 的倍數，上一個倍數是？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} 的倍數每次相差 ${A}，上一個倍數是 ${M} − ${A} = ${ans}。`
+                    };
+                }
+
+                // 題型 5: 120是5的倍數，下一個倍數是?
+                case 5: {
+                    const A = randInt(4, 16);
+                    const k = randInt(3, 20);
+                    const M = A * k;
+                    const ans = M + A;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 陷阱：上一個倍數 M-A、直接加1 (M+1)、加錯商 (M+k)
+                    const traps = [M - A, M + 1, M + k, M + A - 1];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '倍數',
+                        format: qFormat,
+                        prompt: `${M} 是 ${A} 的倍數，下一個倍數是？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} 的倍數每次相差 ${A}，下一個倍數是 ${M} + ${A} = ${ans}。`
+                    };
+                }
+
+                // ==================== 單元 2：因數 ====================
+                // 題型 6: 以下哪個是16的因數? (高誘導性：誘答放入 16 的倍數如 32, 48！)
+                case 6: {
+                    const compositePool = [12, 14, 15, 16, 18, 20, 21, 24, 27, 28, 30, 32, 35, 36, 40, 42, 45, 48];
+                    const A = pickRandom(compositePool);
+                    const factors = getFactors(A).filter(f => f > 1 && f < A);
+                    const correct = pickRandom(factors);
+                    // 陷阱：A 的倍數 (A*2, A*3) 及無法整除 A 的鄰近數
+                    const traps = [A * 2, A * 3, correct + 1, correct + 2, A - 2];
+                    const options = buildTrapOptions(correct, traps, x => A % x === 0);
+                    return {
+                        topic: '因數',
+                        format: 'mc',
+                        prompt: `以下哪個是 ${A} 的因數？`,
+                        answer: String(correct),
+                        options,
+                        explanation: `${A} ÷ ${correct} = ${A / correct}（整除），所以 ${correct} 是 ${A} 的因數（注意：${A * 2} 是 ${A} 的倍數而不是因數！）。`
+                    };
+                }
+
+                // 題型 7: 16是以下哪個數的因數? (高誘導性：誘答放入 16 的因數如 2, 4, 8！)
+                case 7: {
+                    const A = pickRandom([6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 24]);
+                    const k = randInt(2, 5);
+                    const correct = A * k;
+                    // 陷阱：學生看到「16」和「因數」就選 16 的因數 (如 2, 4, 8)
+                    const properFactors = shuffleArray(getFactors(A).filter(f => f > 1 && f < A));
+                    const traps = [...properFactors.slice(0, 2), A * k + 2, A + 4];
+                    const options = buildTrapOptions(correct, traps, x => x % A === 0);
+                    return {
+                        topic: '因數',
+                        format: 'mc',
+                        prompt: `${A} 是以下哪個數的因數？`,
+                        answer: String(correct),
+                        options,
+                        explanation: `因為 ${correct} ÷ ${A} = ${k}（整除），所以 ${A} 是 ${correct} 的因數（切勿把題目看反選了 ${A} 的因數！）。`
+                    };
+                }
+
+                // 題型 8: 25有多少個因數? (高誘導性：針對平方數誘答固定包含 2, 4, 5 等)
+                case 8: {
+                    const numberPool = [4, 9, 16, 25, 36, 49, 64, 81, 6, 8, 10, 12, 15, 18, 20, 24, 28, 30, 32];
+                    const A = pickRandom(numberPool);
+                    const factors = getFactors(A);
+                    const ans = factors.length;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const isSquare = Math.sqrt(A) % 1 === 0;
+                    const sqrtVal = Math.round(Math.sqrt(A));
+
+                    // 若為平方數 (如 25 有 1, 5, 25 共 3 個因數)，學生常誤以為成雙成對答 4 個、漏算答 2 個、或直接答平方根 5
+                    const traps = isSquare
+                        ? [2, 4, sqrtVal, ans + 2]
+                        : [ans - 1, ans + 1, ans - 2, ans + 2, 2];
+
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '因數',
+                        format: qFormat,
+                        prompt: `${A} 有多少個因數？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} 的所有因數有：${factors.join('、')}，共有 ${ans} 個因數${isSquare ? `（注意 ${sqrtVal} × ${sqrtVal} = ${A}，重複的 ${sqrtVal} 只算 1 次）` : ''}。`
+                    };
+                }
+
+                // ==================== 單元 3：質數及合成數 ====================
+                // 題型 9: 以下哪個數是質數? (高誘導性：誘答使用 1 及 9, 15, 21, 27, 39, 49, 51, 57, 87, 91 等奇合成數)
+                case 9: {
+                    const correct = pickRandom(PRIMES_UNDER_100);
+                    const oddTrapPool = shuffleArray(TRICKY_ODD_COMPOSITES);
+                    const traps = [1, oddTrapPool[0], oddTrapPool[1], oddTrapPool[2]];
+                    const useOne = Math.random() < 0.5;
+                    const selectedTraps = useOne ? [1, oddTrapPool[0], oddTrapPool[1]] : [oddTrapPool[0], oddTrapPool[1], oddTrapPool[2]];
+                    const options = shuffleArray([String(correct), ...selectedTraps.map(String)]);
+                    return {
+                        topic: '質數及合成數',
+                        format: 'mc',
+                        prompt: `以下哪個數是質數？`,
+                        answer: String(correct),
+                        options,
+                        explanation: `${correct} 只有 1 和 ${correct} 兩個因數，所以是質數（注意：單數不一定是質數，而且 1 既不是質數也不是合成數）。`
+                    };
+                }
+
+                // 題型 10: 以下哪個數是合成數? (高誘導性：正確答案優先選奇合成數，誘答放入 1、偶質數 2 及其他質數)
+                case 10: {
+                    const correct = Math.random() < 0.75 ? pickRandom(TRICKY_ODD_COMPOSITES) : pickRandom(COMPOSITES_UNDER_100);
+                    const primeTraps = shuffleArray(PRIMES_UNDER_100.filter(p => p !== 2));
+                    const specialTrap = pickRandom([1, 2]);
+                    const selectedTraps = [specialTrap, primeTraps[0], primeTraps[1]];
+                    const options = shuffleArray([String(correct), ...selectedTraps.map(String)]);
+                    const factors = getFactors(correct);
+                    return {
+                        topic: '質數及合成數',
+                        format: 'mc',
+                        prompt: `以下哪個數是合成數？`,
+                        answer: String(correct),
+                        options,
+                        explanation: `${correct} 的因數有 ${factors.join('、')}（共 ${factors.length} 個），所以 ${correct} 是合成數（注意：2 是唯一的偶數質數，1 不是合成數）。`
+                    };
+                }
+
+                // ==================== 單元 4：乘法 ====================
+                // 題型 11: 兩位數 × 兩位數
+                case 11: {
+                    const A = randInt(12, 98);
+                    const B = randInt(12, 89);
+                    const ans = A * B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const onesB = B % 10;
+                    const tensB = Math.floor(B / 10);
+                    // 典型直式錯誤：十位忘記補 0 (A*onesB + A*tensB)、進位錯 ±10 / ±100 (保持個位數字相同！)
+                    const noShiftError = A * onesB + A * tensB;
+                    const traps = [ans + 100, ans - 100, ans + 10, ans - 10, noShiftError, A * (B + 1)];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '乘法',
+                        format: qFormat,
+                        prompt: `計算：${A} × ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} × ${B} = ${ans}（先算 ${A} × ${onesB} = ${A * onesB}，再算 ${A} × ${tensB * 10} = ${A * tensB * 10}，相加得 ${ans}）。`
+                    };
+                }
+
+                // 題型 12: 三位數 × 兩位數
+                case 12: {
+                    const A = randInt(105, 498);
+                    const B = randInt(12, 68);
+                    const ans = A * B;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const onesB = B % 10;
+                    const tensB = Math.floor(B / 10);
+                    const noShiftError = A * onesB + A * tensB;
+                    const traps = [ans + 100, ans - 100, ans + 1000, ans - 10, noShiftError];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '乘法',
+                        format: qFormat,
+                        prompt: `計算：${A} × ${B} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} × ${B} = ${ans}。`
+                    };
+                }
+
+                // 題型 13: 乘法應用題
+                case 13: {
+                    const templates = [
+                        () => {
+                            const price = randInt(24, 165);
+                            const qty = randInt(14, 48);
+                            const ans = price * qty;
+                            return {
+                                prompt: `運動水壺每個售 ${price} 元，學校訂購了 ${qty} 個，共需付多少元？`,
+                                ans,
+                                traps: [ans + 100, ans - 100, ans + 10, price + qty],
+                                exp: `${price} × ${qty} = ${ans}（元）。`
+                            };
+                        },
+                        () => {
+                            const perBox = randInt(24, 144);
+                            const boxes = randInt(15, 36);
+                            const ans = perBox * boxes;
+                            return {
+                                prompt: `每盒顏色筆有 ${perBox} 枝，美勞室買了 ${boxes} 盒，共有顏色筆多少枝？`,
+                                ans,
+                                traps: [ans + 100, ans - 100, ans + 10, perBox * (boxes - 1)],
+                                exp: `${perBox} × ${boxes} = ${ans}（枝）。`
+                            };
+                        },
+                        () => {
+                            // 星期轉換陷阱題 (1星期 = 7天)
+                            const perDay = randInt(15, 45);
+                            const weeks = randInt(3, 8);
+                            const days = weeks * 7;
+                            const ans = perDay * days;
+                            return {
+                                prompt: `小欣每天練習背誦英文生字 ${perDay} 個，她連續練習了 ${weeks} 星期，共背誦了生字多少個？`,
+                                ans,
+                                traps: [perDay * weeks, ans + 70, ans - 70, perDay * (days - 1)],
+                                exp: `1 星期有 7 天，${weeks} 星期共有 7 × ${weeks} = ${days} 天；共背誦了 ${perDay} × ${days} = ${ans}（個）。`
+                            };
+                        }
+                    ];
+                    const item = pickRandom(templates)();
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const options = qFormat === 'mc' ? buildTrapOptions(item.ans, item.traps, x => x === item.ans) : [];
+                    return {
+                        topic: '乘法',
+                        format: qFormat,
+                        prompt: item.prompt,
+                        answer: String(item.ans),
+                        options,
+                        explanation: item.exp
+                    };
+                }
+
+                // ==================== 單元 5：除法及餘數處理 ====================
+                // 題型 14: 兩位數 ÷ 兩位數 (整除)
+                case 14: {
+                    const divisor = randInt(12, 24);
+                    const ans = randInt(3, Math.floor(98 / divisor));
+                    const dividend = divisor * ans;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [ans + 1, ans - 1, ans + 2, ans + 10];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: `計算：${dividend} ÷ ${divisor} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `因為 ${divisor} × ${ans} = ${dividend}，所以 ${dividend} ÷ ${divisor} = ${ans}。`
+                    };
+                }
+
+                // 題型 15: 三位數 ÷ 兩位數 (整除)
+                case 15: {
+                    const divisor = randInt(12, 38);
+                    const ans = randInt(11, Math.min(45, Math.floor(980 / divisor)));
+                    const dividend = divisor * ans;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [ans + 1, ans - 1, ans + 10, ans - 10];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: `計算：${dividend} ÷ ${divisor} = _____`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${dividend} ÷ ${divisor} = ${ans}。`
+                    };
+                }
+
+                // 題型 16: 整除除法應用題
+                case 16: {
+                    const divisor = randInt(12, 32);
+                    const ans = randInt(8, 28);
+                    const total = divisor * ans;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    const traps = [ans + 1, ans - 1, ans + 10, divisor];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: `把 ${total} 本圖書平均分給 ${divisor} 班，每班可分得圖書多少本？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${total} ÷ ${divisor} = ${ans}，每班可分得 ${ans} 本。`
+                    };
+                }
+
+                // 題型 17: 餘數處理應用題 (一)：「最多可裝滿 / 最多可買」(去尾法：取商 Q)
+                case 17: {
+                    const B = randInt(12, 28);
+                    const Q = randInt(6, 22);
+                    const R = randInt(2, B - 1);
+                    const A = B * Q + R;
+                    const ans = Q;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 高誘導誘答：進一法 Q+1、餘數 R、還欠多少 B-R
+                    const traps = [Q + 1, R, B - R, Q - 1];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    const scenarios = [
+                        `有曲奇餅 ${A} 塊，每 ${B} 塊裝成一袋，最多可裝滿多少袋？`,
+                        `每個筆袋售 ${B} 元，哥哥有 ${A} 元，最多可買筆袋多少個？`
+                    ];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: pickRandom(scenarios),
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} ÷ ${B} = ${Q} ... ${R}。餘下的 ${R} 不夠再裝滿 1 袋（或再買 1 個），所以最多只可裝滿/買 ${Q}。`
+                    };
+                }
+
+                // 題型 18: 餘數處理應用題 (二)：「最少要」(進一法：商 + 1)
+                case 18: {
+                    const B = randInt(12, 35);
+                    const Q = randInt(5, 18);
+                    const R = randInt(2, B - 1);
+                    const A = B * Q + R;
+                    const ans = Q + 1;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 高誘導誘答：忘記加 1 的商 Q、餘數 R、Q+2
+                    const traps = [Q, R, B - R, Q + 2];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    const scenarios = [
+                        `有 ${A} 位師生參加旅行，每輛小巴最多可載 ${B} 人，最少要小巴多少輛才可載完所有人？`,
+                        `有雞蛋 ${A} 隻，每個紙盒可裝 ${B} 隻，要把所有雞蛋裝入盒內，最少要紙盒多少個？`
+                    ];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: pickRandom(scenarios),
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} ÷ ${B} = ${Q} ... ${R}。餘下的 ${R} 也需要多 1 輛車/個盒才可全部載完，所以最少要 ${Q} + 1 = ${ans}。`
+                    };
+                }
+
+                // 題型 19: 餘數處理應用題 (三)：「把餘下的放到其中一袋，該袋共有多少個？」(除數 B + 餘數 R)
+                case 19: {
+                    const B = randInt(12, 26);
+                    const Q = randInt(6, 18);
+                    const R = randInt(2, B - 2);
+                    const A = B * Q + R;
+                    const ans = B + R;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 高誘導誘答：只答餘數 R、誤把商加餘數 Q+R、答袋數 Q 或 Q+1
+                    const traps = [R, Q + R, Q, B - R];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: `有糖果 ${A} 粒，每 ${B} 粒裝成一袋。如果把餘下的糖果全部放到其中一袋裏，該袋共有糖果多少粒？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} ÷ ${B} = ${Q}（袋）... ${R}（粒）。原本每袋有 ${B} 粒，加上餘下的 ${R} 粒，該袋共有 ${B} + ${R} = ${ans} 粒。`
+                    };
+                }
+
+                // 題型 20: 餘數處理應用題 (四)：「把餘下的也裝滿一袋，還欠多少個？」(除數 B - 餘數 R)
+                case 20: {
+                    const B = randInt(12, 28);
+                    const Q = randInt(6, 18);
+                    const R = randInt(2, B - 2);
+                    if (B - R === R) R = Math.max(1, R - 1);
+                    const A = B * Q + R;
+                    const ans = B - R;
+                    const qFormat = resolveFormat(true, preferredMode);
+                    // 高誘導誘答：直接答餘數 R、答商 Q、答 B+R
+                    const traps = [R, Q, B + R, Q + 1];
+                    const options = qFormat === 'mc' ? buildTrapOptions(ans, traps, x => x === ans) : [];
+                    return {
+                        topic: '除法及餘數處理',
+                        format: qFormat,
+                        prompt: `有蘋果 ${A} 個，每 ${B} 個裝滿一箱。如果要把餘下的蘋果也裝滿一箱，還欠蘋果多少個？`,
+                        answer: String(ans),
+                        options,
+                        explanation: `${A} ÷ ${B} = ${Q}（箱）... ${R}（個）。每箱要裝 ${B} 個，現在餘下 ${R} 個，所以還欠 ${B} − ${R} = ${ans} 個。`
+                    };
+                }
+
+                // ==================== 單元 6：四邊形的特性及從屬關係 (不含鷂形) ====================
+                case 21: {
+                    return generateQuadrilateralQuestion();
+                }
+            }
+        }
+
+        function generateQuestionDeck(count, topics, preferredMode) {
+            const allowedTypes = [];
+            if (topics.multiples) allowedTypes.push(1, 2, 3, 4, 5);
+            if (topics.factors) allowedTypes.push(6, 7, 8);
+            if (topics.primes) allowedTypes.push(9, 10);
+            if (topics.multiplication) allowedTypes.push(11, 12, 13);
+            if (topics.division) allowedTypes.push(14, 15, 16, 17, 18, 19, 20);
+            if (topics.quadrilaterals) allowedTypes.push(21, 21, 21);
+
+            const questions = [];
+            let typeBag = [];
+            for (let i = 0; i < count; i++) {
+                if (typeBag.length === 0) {
+                    typeBag = shuffleArray(allowedTypes);
+                }
+                const chosenType = typeBag.pop();
+                questions.push(generateSingleQuestion(chosenType, preferredMode));
+            }
+            return questions;
+        }
+
+        /**************************************************************
+         * 6. 老師端設定與創建房間流程 (含自訂題數及作答時間)
+         **************************************************************/
+        function toggleAllTopics(checked) {
+            playSfx('click');
+            [
+                'topic-multiples',
+                'topic-factors',
+                'topic-primes',
+                'topic-multiplication',
+                'topic-division',
+                'topic-quadrilaterals'
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = checked;
+            });
+        }
+
+        function updatePresetButtonStyles(group, val) {
+            const selectorMap = {
+                qCount: '.qcount-btn',
+                timeLimit: '.time-btn',
+                qFormat: '.format-btn'
+            };
+            document.querySelectorAll(selectorMap[group]).forEach(btn => {
+                const btnVal = btn.getAttribute('data-val');
+                if (String(btnVal) === String(val)) {
+                    btn.className = btn.className
+                        .replace('border-gray-200 text-gray-700 hover:bg-gray-100', '')
+                        .replace('border-purple-600 bg-purple-600 text-white', '')
+                        .trim() + ' border-purple-600 bg-purple-600 text-white';
+                } else {
+                    btn.className = btn.className
+                        .replace('border-purple-600 bg-purple-600 text-white', '')
+                        .replace('border-gray-200 text-gray-700 hover:bg-gray-100', '')
+                        .trim() + ' border-gray-200 text-gray-700 hover:bg-gray-100';
+                }
+            });
+        }
+
+        function selectOption(group, val) {
+            playSfx('click');
+            state.setup[group] = val;
+
+            if (group === 'qCount') {
+                const input = document.getElementById('customQCountInput');
+                if (input) input.value = val;
+            } else if (group === 'timeLimit') {
+                const input = document.getElementById('customTimeLimitInput');
+                if (input) input.value = val;
+            }
+
+            updatePresetButtonStyles(group, val);
+        }
+
+        function handleCustomInput(group, rawVal) {
+            const num = parseInt(rawVal, 10);
+            if (!isNaN(num) && num > 0) {
+                state.setup[group] = num;
+                updatePresetButtonStyles(group, num);
+            }
+        }
+
+        // 尋找 1~99 中未被佔用（或已超過2小時閒置）的最短房號
+        async function allocateShortRoomPin() {
+            const snap = await db.ref(ROOMS_PATH).once('value');
+            const rooms = snap.val() || {};
+            const now = Date.now();
+            const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+            // 優先從 1~9 隨機挑一個空房，若滿則挑 10~99
+            const singleDigits = shuffleArray([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            for (const pin of singleDigits) {
+                const r = rooms[pin];
+                if (!r || (now - (r.createdAt || 0) > TWO_HOURS)) {
+                    return String(pin);
+                }
+            }
+
+            const doubleDigits = [];
+            for (let i = 10; i <= 99; i++) doubleDigits.push(i);
+            for (const pin of shuffleArray(doubleDigits)) {
+                const r = rooms[pin];
+                if (!r || (now - (r.createdAt || 0) > TWO_HOURS)) {
+                    return String(pin);
+                }
+            }
+            return String(randInt(1, 99));
+        }
+
+        async function handleCreateRoom() {
+            const multiples = document.getElementById('topic-multiples').checked;
+            const factors = document.getElementById('topic-factors').checked;
+            const primes = document.getElementById('topic-primes').checked;
+            const multiplication = document.getElementById('topic-multiplication').checked;
+            const division = document.getElementById('topic-division').checked;
+            const quadrilaterals = document.getElementById('topic-quadrilaterals').checked;
+
+            if (!multiples && !factors && !primes && !multiplication && !division && !quadrilaterals) {
+                showModal('請選擇單元', '請至少勾選一個考核單元！');
+                return;
+            }
+
+            // 讀取並驗證手動輸入的題數及時間
+            const customQ = parseInt(document.getElementById('customQCountInput').value, 10);
+            const customTime = parseInt(document.getElementById('customTimeLimitInput').value, 10);
+
+            if (isNaN(customQ) || customQ < 1 || customQ > 50) {
+                showModal('題目數目設定錯誤', '請輸入 1 至 50 之間的題目數量！');
+                return;
+            }
+            if (isNaN(customTime) || customTime < 5 || customTime > 300) {
+                showModal('作答時間設定錯誤', '每題作答時間請設定在 5 至 300 秒之間！');
+                return;
+            }
+
+            state.setup.qCount = customQ;
+            state.setup.timeLimit = customTime;
+
+            const submitBtn = document.getElementById('createRoomSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在開啟房間...';
+
+            try {
+                const pin = await allocateShortRoomPin();
+                const topics = { multiples, factors, primes, multiplication, division, quadrilaterals };
+                const questions = generateQuestionDeck(state.setup.qCount, topics, state.setup.qFormat);
+
+                const roomPayload = {
+                    pin: pin,
+                    status: 'lobby', // 'lobby' | 'question' | 'leaderboard' | 'finished'
+                    createdAt: Date.now(),
+                    config: {
+                        qCount: state.setup.qCount,
+                        timeLimit: state.setup.timeLimit,
+                        qFormat: state.setup.qFormat,
+                        topics: topics
+                    },
+                    currentQIndex: 0,
+                    questionStartTime: 0,
+                    questions: questions,
+                    players: {}
+                };
+
+                await db.ref(`${ROOMS_PATH}/${pin}`).set(roomPayload);
+                // 斷線時自動清理房間
+                db.ref(`${ROOMS_PATH}/${pin}`).onDisconnect().remove();
+
+                state.role = 'host';
+                state.roomPin = pin;
+                playSfx('join');
+                subscribeToRoom(pin);
+            } catch (err) {
+                console.error(err);
+                showModal('連線錯誤', '無法建立房間，請檢查網絡連線後再試。');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-rocket"></i><span>立即開啟房間</span>';
+            }
+        }
+
+        async function handleRegenerateQuestions() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const cfg = state.roomData.config;
+            const newQuestions = generateQuestionDeck(cfg.qCount, cfg.topics, cfg.qFormat);
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}/questions`).set(newQuestions);
+            playSfx('click');
+            showModal('已重新抽題', `已重新隨機生成 ${cfg.qCount} 條題目！`);
+        }
+
+        /**************************************************************
+         * 7. 學生端加入房間流程
+         **************************************************************/
+        async function handleCheckRoomPin() {
+            const rawPin = document.getElementById('joinPinInput').value.trim();
+            if (!rawPin) {
+                showModal('請輸入房號', '請輸入老師螢幕上顯示的 1 至 2 位數字房號。');
+                return;
+            }
+
+            try {
+                const snap = await db.ref(`${ROOMS_PATH}/${rawPin}`).once('value');
+                if (!snap.exists()) {
+                    showModal('找不到房間', `房號「${rawPin}」目前沒有開啟，請確認房號是否正確。`);
+                    return;
+                }
+                const room = snap.val();
+                if (room.status === 'finished') {
+                    showModal('比賽已結束', '這個房間的比賽已經結束了！');
+                    return;
+                }
+
+                state.roomPin = rawPin;
+                document.getElementById('studentJoinPinDisplay').textContent = rawPin;
+                playSfx('click');
+                showView('view-student-profile');
+                setTimeout(() => document.getElementById('studentNameInput').focus(), 100);
+            } catch (err) {
+                console.error(err);
+                showModal('連線失敗', '讀取房間資料時發生錯誤，請稍後再試。');
+            }
+        }
+
+        async function handleStudentJoinLobby() {
+            const classNo = parseInt(document.getElementById('studentClassNo').value, 10);
+            const name = document.getElementById('studentNameInput').value.trim();
+
+            if (!name) {
+                showModal('請輸入姓名', '請填寫你的姓名以便顯示在排行榜上！');
+                return;
+            }
+
+            try {
+                const snap = await db.ref(`${ROOMS_PATH}/${state.roomPin}`).once('value');
+                if (!snap.exists()) {
+                    showModal('房間已關閉', '老師已關閉此房間。', () => showView('view-home'));
+                    return;
+                }
+
+                const playerId = 'p_' + classNo + '_' + Math.random().toString(36).substring(2, 7);
+                state.role = 'student';
+                state.playerId = playerId;
+                state.classNo = classNo;
+                state.playerName = name;
+
+                const playerObj = {
+                    id: playerId,
+                    classNo: classNo,
+                    name: name,
+                    score: 0,
+                    lastDelta: 0,
+                    lastCorrect: false,
+                    streak: 0,
+                    correctCount: 0,
+                    joinedAt: Date.now()
+                };
+
+                const playerRef = db.ref(`${ROOMS_PATH}/${state.roomPin}/players/${playerId}`);
+                await playerRef.set(playerObj);
+                playerRef.onDisconnect().remove();
+
+                playSfx('join');
+                subscribeToRoom(state.roomPin);
+            } catch (err) {
+                console.error(err);
+                showModal('加入失敗', '無法加入房間，請重試。');
+            }
+        }
+
+        /**************************************************************
+         * 8. 即時資料庫監聽與狀態同步引擎
+         **************************************************************/
+        function subscribeToRoom(pin) {
+            if (state.roomRef) state.roomRef.off();
+            state.roomRef = db.ref(`${ROOMS_PATH}/${pin}`);
+
+            state.roomRef.on('value', snapshot => {
+                const data = snapshot.val();
+                if (!data) {
+                    if (state.role === 'student') {
+                        clearInterval(state.timerInterval);
+                        showModal('房間已結束', '老師已關閉房間，將返回主頁。', () => cleanupAndGoHome());
+                    }
+                    return;
+                }
+
+                // 若學生被老師踢出
+                if (state.role === 'student' && state.playerId) {
+                    const players = data.players || {};
+                    if (!players[state.playerId]) {
+                        clearInterval(state.timerInterval);
+                        state.roomRef.off();
+                        state.roomPin = null;
+                        showModal('已離開房間', '你已被主持人移出房間。', () => showView('view-home'));
+                        return;
+                    }
+                }
+
+                state.roomData = data;
+                syncUIWithRoomState(data);
+            });
+        }
+
+        function syncUIWithRoomState(room) {
+            const statusChanged = state.lastRenderedStatus !== room.status;
+            const qIndexChanged = state.lastRenderedQIndex !== room.currentQIndex;
+
+            state.lastRenderedStatus = room.status;
+            state.lastRenderedQIndex = room.currentQIndex;
+
+            if (room.status === 'lobby') {
+                clearInterval(state.timerInterval);
+                renderLobbyView(room);
+            } else if (room.status === 'question') {
+                if (statusChanged || qIndexChanged) {
+                    state.hasSubmittedCurrentQ = false;
+                    playSfx('start');
+                    setupQuestionView(room);
+                }
+                updateQuestionLiveProgress(room);
+            } else if (room.status === 'leaderboard') {
+                clearInterval(state.timerInterval);
+                if (statusChanged) {
+                    renderLeaderboardView(room);
+                } else {
+                    updateLeaderboardRowsOnly(room);
+                }
+            } else if (room.status === 'finished') {
+                clearInterval(state.timerInterval);
+                if (statusChanged) {
+                    playSfx('podium');
+                    triggerConfetti();
+                    renderPodiumView(room);
+                }
+            }
+        }
+
+        /**************************************************************
+         * 9. 畫面渲染：等候大廳 (LOBBY)
+         **************************************************************/
+        function renderLobbyView(room) {
+            showView('view-lobby');
+            document.getElementById('lobbyPinNumber').textContent = room.pin;
+
+            const cfg = room.config;
+            document.getElementById('lobbyConfigSummary').textContent = `${cfg.qCount} 題 · 每題 ${cfg.timeLimit} 秒`;
+
+            const topicNames = [];
+            if (cfg.topics.multiples) topicNames.push('倍數');
+            if (cfg.topics.factors) topicNames.push('因數');
+            if (cfg.topics.primes) topicNames.push('質數及合成數');
+            if (cfg.topics.multiplication) topicNames.push('乘法');
+            if (cfg.topics.division) topicNames.push('除法及餘數處理');
+            if (cfg.topics.quadrilaterals) topicNames.push('四邊形');
+            document.getElementById('lobbyTopicsSummary').textContent = `單元：${topicNames.join('、')}`;
+
+            const hostActions = document.getElementById('hostLobbyActions');
+            const studentBadge = document.getElementById('studentLobbyBadge');
+            const kickHint = document.getElementById('hostKickHint');
+
+            if (state.role === 'host') {
+                hostActions.classList.remove('hidden');
+                hostActions.classList.add('flex');
+                studentBadge.classList.add('hidden');
+                kickHint.classList.remove('hidden');
+            } else {
+                hostActions.classList.add('hidden');
+                hostActions.classList.remove('flex');
+                studentBadge.classList.remove('hidden');
+                kickHint.classList.add('hidden');
+                document.getElementById('studentSelfTag').textContent = `[${state.classNo}號] ${state.playerName}`;
+            }
+
+            const playersObj = room.players || {};
+            const playerList = Object.values(playersObj).sort((a, b) => a.classNo - b.classNo);
+            document.getElementById('lobbyPlayerCount').textContent = playerList.length;
+
+            const grid = document.getElementById('lobbyPlayersGrid');
+            if (playerList.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-10 text-center text-purple-200/70">
+                        <i class="fa-solid fa-hourglass-half text-3xl mb-2 animate-pulse"></i>
+                        <p class="font-bold">正在等待學生輸入房號「${room.pin}」加入...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = playerList.map(p => {
+                const isMe = p.id === state.playerId;
+                const highlightClass = isMe
+                    ? 'bg-amber-300 text-purple-950 border-amber-500 ring-4 ring-amber-300/40'
+                    : 'bg-white text-gray-900 border-gray-300';
+                const clickAttr = state.role === 'host' ? `onclick="hostKickPlayer('${p.id}', '${escapeHtml(p.name)}')" title="點擊移出學生"` : '';
+                const cursorClass = state.role === 'host' ? 'cursor-pointer hover:bg-rose-50 hover:border-rose-400' : '';
+
+                return `
+                    <div ${clickAttr} class="${highlightClass} ${cursorClass} rounded-2xl px-4 py-3 shadow border-b-4 flex items-center justify-between transition animate-pop">
+                        <div class="flex items-center gap-2 truncate">
+                            <span class="bg-purple-700 text-white text-xs font-black px-2 py-0.5 rounded-lg shrink-0">${p.classNo}號</span>
+                            <span class="font-black truncate">${escapeHtml(p.name)}</span>
+                        </div>
+                        ${state.role === 'host' ? '<i class="fa-solid fa-xmark text-gray-400 hover:text-rose-600 text-sm ml-1"></i>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function hostKickPlayer(playerId, name) {
+            if (state.role !== 'host') return;
+            showModal('移出學生', `確定要將「${name}」移出房間嗎？`, () => {
+                db.ref(`${ROOMS_PATH}/${state.roomPin}/players/${playerId}`).remove();
+            }, true);
+        }
+
+        async function hostStartGame() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const players = state.roomData.players || {};
+            if (Object.keys(players).length === 0) {
+                showModal('尚無學生加入', '請等待至少 1 位學生加入房間後再開始比賽！');
+                return;
+            }
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                status: 'question',
+                currentQIndex: 0,
+                questionStartTime: Date.now(),
+                currentAnswers: null
+            });
+        }
+
+        /**************************************************************
+         * 10. 畫面渲染與計時：作答階段 (QUESTION PHASE)
+         **************************************************************/
+        function setupQuestionView(room) {
+            showView('view-question');
+
+            const qIndex = room.currentQIndex || 0;
+            const totalQ = room.questions.length;
+            const q = room.questions[qIndex];
+
+            document.getElementById('qProgressBadge').textContent = `第 ${qIndex + 1} / ${totalQ} 題`;
+            document.getElementById('qTopicBadge').textContent = q.topic;
+            document.getElementById('questionText').textContent = q.prompt;
+
+            // 角色頂部資訊
+            const studentHeader = document.getElementById('studentScoreHeader');
+            const hostControls = document.getElementById('hostQuestionControls');
+
+            if (state.role === 'student') {
+                studentHeader.classList.remove('hidden');
+                studentHeader.classList.add('flex');
+                hostControls.classList.add('hidden');
+                hostControls.classList.remove('flex');
+
+                const me = (room.players && room.players[state.playerId]) || { score: 0, streak: 0 };
+                document.getElementById('studentCurrentScore').textContent = me.score || 0;
+                const streakBadge = document.getElementById('studentStreakBadge');
+                if ((me.streak || 0) >= 2) {
+                    streakBadge.classList.remove('hidden');
+                    streakBadge.classList.add('flex');
+                    document.getElementById('studentStreakCount').textContent = me.streak;
+                } else {
+                    streakBadge.classList.add('hidden');
+                }
+            } else {
+                studentHeader.classList.add('hidden');
+                hostControls.classList.remove('hidden');
+                hostControls.classList.add('flex');
+            }
+
+            // 檢查學生是否已作答此題 (例如重新整理網頁時)
+            const existingAns = room.currentAnswers && room.currentAnswers[state.playerId];
+            if (state.role === 'student' && existingAns) {
+                state.hasSubmittedCurrentQ = true;
+            }
+
+            const mcArea = document.getElementById('mcAnswerArea');
+            const fillArea = document.getElementById('fillAnswerArea');
+            const waitBox = document.getElementById('studentSubmittedWait');
+
+            if (state.role === 'student' && state.hasSubmittedCurrentQ) {
+                mcArea.classList.add('hidden');
+                fillArea.classList.add('hidden');
+                waitBox.classList.remove('hidden');
+                document.getElementById('studentSubmittedChoiceText').textContent = `你的作答：${existingAns.value}`;
+            } else {
+                waitBox.classList.add('hidden');
+                if (q.format === 'mc') {
+                    mcArea.classList.remove('hidden');
+                    fillArea.classList.add('hidden');
+                    q.options.forEach((optText, idx) => {
+                        document.getElementById(`mc-text-${idx}`).textContent = optText;
+                        const btn = document.getElementById(`mc-btn-${idx}`);
+                        btn.disabled = (state.role === 'host');
+                        btn.classList.toggle('cursor-default', state.role === 'host');
+                    });
+                } else {
+                    mcArea.classList.add('hidden');
+                    fillArea.classList.remove('hidden');
+                    const studentFill = document.getElementById('studentFillControls');
+                    const hostFill = document.getElementById('hostFillNotice');
+                    if (state.role === 'student') {
+                        studentFill.classList.remove('hidden');
+                        hostFill.classList.add('hidden');
+                        const inputBox = document.getElementById('fillInputBox');
+                        inputBox.value = '';
+                        setTimeout(() => inputBox.focus(), 100);
+                    } else {
+                        studentFill.classList.add('hidden');
+                        hostFill.classList.remove('hidden');
+                    }
+                }
+            }
+
+            startQuestionCountdown(room);
+        }
+
+        function startQuestionCountdown(room) {
+            clearInterval(state.timerInterval);
+            const timeLimitSec = room.config.timeLimit || 20;
+            const startTime = room.questionStartTime || Date.now();
+            const timerCircle = document.getElementById('timerCircle');
+            const timerBar = document.getElementById('timerBar');
+            let lastWholeSec = -1;
+
+            state.timerInterval = setInterval(() => {
+                const elapsedSec = (Date.now() - startTime) / 1000;
+                const remaining = Math.max(0, timeLimitSec - elapsedSec);
+                const wholeSec = Math.ceil(remaining);
+
+                timerCircle.textContent = wholeSec;
+                const pct = Math.max(0, Math.min(100, (remaining / timeLimitSec) * 100));
+                timerBar.style.width = `${pct}%`;
+
+                if (wholeSec <= 5 && wholeSec > 0 && wholeSec !== lastWholeSec) {
+                    lastWholeSec = wholeSec;
+                    playSfx('tick');
+                    timerCircle.classList.add('bg-rose-600', 'scale-110');
+                    setTimeout(() => timerCircle.classList.remove('scale-110'), 150);
+                } else if (wholeSec > 5) {
+                    timerCircle.classList.remove('bg-rose-600');
+                }
+
+                if (remaining <= 0) {
+                    clearInterval(state.timerInterval);
+                    if (state.role === 'host') {
+                        hostFinalizeQuestionRound();
+                    }
+                }
+            }, 100);
+        }
+
+        function updateQuestionLiveProgress(room) {
+            const players = room.players || {};
+            const totalPlayers = Object.keys(players).length;
+            const answers = room.currentAnswers || {};
+            const answeredCount = Object.keys(answers).length;
+
+            if (state.role === 'host') {
+                document.getElementById('hostAnsweredCount').textContent = `${answeredCount} / ${totalPlayers}`;
+                // 若全員皆已作答，自動提前結束倒數並揭曉
+                if (totalPlayers > 0 && answeredCount >= totalPlayers && room.status === 'question') {
+                    clearInterval(state.timerInterval);
+                    setTimeout(() => {
+                        if (state.roomData && state.roomData.status === 'question') {
+                            hostFinalizeQuestionRound();
+                        }
+                    }, 450);
+                }
+            }
+        }
+
+        // 學生提交選擇題答案
+        function submitStudentAnswer(optionIndex) {
+            if (state.role !== 'student' || state.hasSubmittedCurrentQ || !state.roomData) return;
+            const q = state.roomData.questions[state.roomData.currentQIndex];
+            const chosenValue = q.options[optionIndex];
+            sendAnswerToFirebase(chosenValue);
+        }
+
+        // 填充題小鍵盤輔助
+        function appendFillDigit(digit) {
+            playSfx('click');
+            const input = document.getElementById('fillInputBox');
+            if (input.value.length < 6) {
+                input.value += digit;
+            }
+        }
+        function clearFillInput() {
+            playSfx('click');
+            document.getElementById('fillInputBox').value = '';
+        }
+        function backspaceFillInput() {
+            playSfx('click');
+            const input = document.getElementById('fillInputBox');
+            input.value = input.value.slice(0, -1);
+        }
+
+        function submitFillAnswer() {
+            if (state.role !== 'student' || state.hasSubmittedCurrentQ || !state.roomData) return;
+            const val = document.getElementById('fillInputBox').value.trim();
+            if (val === '') {
+                showModal('請輸入答案', '請先輸入數字答案再按提交！');
+                return;
+            }
+            sendAnswerToFirebase(val);
+        }
+
+        async function sendAnswerToFirebase(answerStr) {
+            state.hasSubmittedCurrentQ = true;
+            playSfx('click');
+
+            document.getElementById('mcAnswerArea').classList.add('hidden');
+            document.getElementById('fillAnswerArea').classList.add('hidden');
+            const waitBox = document.getElementById('studentSubmittedWait');
+            waitBox.classList.remove('hidden');
+            document.getElementById('studentSubmittedChoiceText').textContent = `你的作答：${answerStr}`;
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}/currentAnswers/${state.playerId}`).set({
+                value: String(answerStr).trim(),
+                submittedAt: Date.now()
+            });
+        }
+
+        function hostEndQuestionNow() {
+            if (state.role !== 'host') return;
+            clearInterval(state.timerInterval);
+            hostFinalizeQuestionRound();
+        }
+
+        // 老師端統一計算本題所有學生得分並寫入 RTDB，切換至 leaderboard 狀態
+        async function hostFinalizeQuestionRound() {
+            if (state.role !== 'host' || !state.roomData || state.roomData.status !== 'question') return;
+
+            const room = state.roomData;
+            const q = room.questions[room.currentQIndex];
+            const correctAns = String(q.answer).trim();
+            const startTime = room.questionStartTime || Date.now();
+            const timeLimitMs = (room.config.timeLimit || 20) * 1000;
+
+            const players = room.players || {};
+            const answers = room.currentAnswers || {};
+            const updatedPlayers = {};
+
+            Object.keys(players).forEach(pid => {
+                const p = { ...players[pid] };
+                const submission = answers[pid];
+
+                if (submission && String(submission.value).trim() === correctAns) {
+                    const responseTimeMs = Math.max(0, (submission.submittedAt || Date.now()) - startTime);
+                    const timeRatio = Math.max(0, Math.min(1, 1 - (responseTimeMs / timeLimitMs)));
+                    // 基礎分 500 + 速度分最高 500 = 最高 1000 分
+                    const earned = Math.round(500 + 500 * timeRatio);
+
+                    p.score = (p.score || 0) + earned;
+                    p.lastDelta = earned;
+                    p.lastCorrect = true;
+                    p.streak = (p.streak || 0) + 1;
+                    p.correctCount = (p.correctCount || 0) + 1;
+                } else {
+                    p.lastDelta = 0;
+                    p.lastCorrect = false;
+                    p.streak = 0;
+                }
+                updatedPlayers[pid] = p;
+            });
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                players: updatedPlayers,
+                status: 'leaderboard'
+            });
+        }
+
+        /**************************************************************
+         * 11. 畫面渲染：每題詳解與即時排行榜 (LEADERBOARD PHASE)
+         **************************************************************/
+        function renderLeaderboardView(room) {
+            showView('view-leaderboard');
+
+            const qIndex = room.currentQIndex || 0;
+            const totalQ = room.questions.length;
+            const q = room.questions[qIndex];
+            const playersObj = room.players || {};
+            const playerList = Object.values(playersObj);
+            const sortedPlayers = [...playerList].sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+
+            // 題目詳解區
+            document.getElementById('reviewTopicTag').textContent = `單元：${q.topic}`;
+            document.getElementById('reviewQuestionText').textContent = q.prompt;
+            document.getElementById('reviewCorrectAnswer').textContent = q.answer;
+            document.getElementById('reviewExplanation').textContent = `解說：${q.explanation}`;
+
+            const correctCount = playerList.filter(p => p.lastCorrect).length;
+            document.getElementById('reviewStatsBadge').textContent = `本題答對人數：${correctCount} / ${playerList.length} 人`;
+
+            // 學生端顯示個人對錯橫幅與音效
+            const feedbackBanner = document.getElementById('studentRoundFeedback');
+            if (state.role === 'student' && playersObj[state.playerId]) {
+                feedbackBanner.classList.remove('hidden');
+                const me = playersObj[state.playerId];
+                const myRank = sortedPlayers.findIndex(p => p.id === state.playerId) + 1;
+
+                if (me.lastCorrect) {
+                    playSfx('correct');
+                    feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-emerald-600 border-emerald-800 text-white';
+                    document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-check"></i>';
+                    document.getElementById('feedbackTitle').textContent = me.streak >= 2 ? `答對了！（連中 ${me.streak} 題🔥）` : '答對了！做得好！';
+                    document.getElementById('feedbackSub').textContent = `目前總分 ${me.score} 分 · 全班排第 ${myRank} 名`;
+                    document.getElementById('feedbackDelta').textContent = `+${me.lastDelta}`;
+                } else {
+                    playSfx('wrong');
+                    feedbackBanner.className = 'mb-5 rounded-3xl p-5 shadow-xl border-b-8 flex items-center justify-between bg-rose-600 border-rose-800 text-white';
+                    document.getElementById('feedbackIconBox').innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                    document.getElementById('feedbackTitle').textContent = '這題答錯了，繼續加油！';
+                    document.getElementById('feedbackSub').textContent = `看看下方解說，下一題追回來！目前排第 ${myRank} 名`;
+                    document.getElementById('feedbackDelta').textContent = '+0';
+                }
+            } else {
+                feedbackBanner.classList.add('hidden');
+                playSfx('correct');
+            }
+
+            // 老師端下一題按鈕
+            const nextBtn = document.getElementById('hostNextQuestionBtn');
+            if (state.role === 'host') {
+                nextBtn.classList.remove('hidden');
+                nextBtn.classList.add('flex');
+                const isLast = (qIndex + 1) >= totalQ;
+                document.getElementById('hostNextBtnText').textContent = isLast ? '查看最終頒獎台' : '下一題';
+            } else {
+                nextBtn.classList.add('hidden');
+            }
+
+            updateLeaderboardRowsOnly(room);
+        }
+
+        function updateLeaderboardRowsOnly(room) {
+            const playersObj = room.players || {};
+            const sortedPlayers = Object.values(playersObj).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+            const listEl = document.getElementById('leaderboardList');
+
+            listEl.innerHTML = sortedPlayers.map((p, idx) => {
+                const rank = idx + 1;
+                const isMe = p.id === state.playerId;
+
+                let rankBadge = `<span class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center font-black text-sm">${rank}</span>`;
+                if (rank === 1) rankBadge = `<span class="w-8 h-8 rounded-full bg-amber-400 text-purple-950 flex items-center justify-center font-black text-sm shadow"><i class="fa-solid fa-crown"></i></span>`;
+                else if (rank === 2) rankBadge = `<span class="w-8 h-8 rounded-full bg-slate-300 text-slate-900 flex items-center justify-center font-black text-sm shadow">2</span>`;
+                else if (rank === 3) rankBadge = `<span class="w-8 h-8 rounded-full bg-amber-700 text-amber-100 flex items-center justify-center font-black text-sm shadow">3</span>`;
+
+                const rowBg = isMe
+                    ? 'bg-amber-400/25 border-2 border-amber-300'
+                    : 'bg-white/10 border border-white/10';
+
+                const deltaBadge = p.lastDelta > 0
+                    ? `<span class="bg-emerald-500 text-white text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl shadow animate-bounce">+${p.lastDelta}</span>`
+                    : `<span class="bg-white/10 text-purple-200 text-xs sm:text-sm font-bold px-2.5 py-1 rounded-xl">+0</span>`;
+
+                return `
+                    <div class="${rowBg} rounded-2xl px-4 py-3 flex items-center justify-between transition">
+                        <div class="flex items-center gap-3 min-w-0">
+                            ${rankBadge}
+                            <span class="bg-purple-800 border border-purple-400/40 text-xs font-black px-2 py-0.5 rounded-lg shrink-0">${p.classNo}號</span>
+                            <span class="font-black text-base sm:text-lg truncate">${escapeHtml(p.name)}</span>
+                            ${isMe ? '<span class="text-xs bg-amber-300 text-purple-950 font-black px-2 py-0.5 rounded-full">你</span>' : ''}
+                            ${(p.streak || 0) >= 2 ? `<span class="text-xs bg-orange-500/90 text-white font-black px-2 py-0.5 rounded-full"><i class="fa-solid fa-fire"></i> ${p.streak}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            ${deltaBadge}
+                            <div class="text-right min-w-[70px]">
+                                <span class="text-lg sm:text-xl font-black text-amber-300">${p.score || 0}</span>
+                                <span class="text-xs text-purple-200">分</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function hostNextQuestion() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const nextIdx = (state.roomData.currentQIndex || 0) + 1;
+            const totalQ = state.roomData.questions.length;
+
+            if (nextIdx >= totalQ) {
+                await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                    status: 'finished'
+                });
+            } else {
+                await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                    status: 'question',
+                    currentQIndex: nextIdx,
+                    questionStartTime: Date.now(),
+                    currentAnswers: null
+                });
+            }
+        }
+
+        /**************************************************************
+         * 12. 畫面渲染：最終頒獎台與匯出成績 (PODIUM VIEW)
+         **************************************************************/
+        function renderPodiumView(room) {
+            showView('view-podium');
+
+            const playersObj = room.players || {};
+            const sortedPlayers = Object.values(playersObj).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+            const totalQ = room.questions ? room.questions.length : 10;
+
+            // 填入冠亞季軍
+            const top1 = sortedPlayers[0];
+            const top2 = sortedPlayers[1];
+            const top3 = sortedPlayers[2];
+
+            document.getElementById('podium1-name').textContent = top1 ? `[${top1.classNo}號] ${top1.name}` : '從缺';
+            document.getElementById('podium1-score').textContent = top1 ? `${top1.score} 分` : '';
+
+            document.getElementById('podium2-name').textContent = top2 ? `[${top2.classNo}號] ${top2.name}` : '從缺';
+            document.getElementById('podium2-score').textContent = top2 ? `${top2.score} 分` : '';
+
+            document.getElementById('podium3-name').textContent = top3 ? `[${top3.classNo}號] ${top3.name}` : '從缺';
+            document.getElementById('podium3-score').textContent = top3 ? `${top3.score} 分` : '';
+
+            const playAgainBtn = document.getElementById('hostPlayAgainBtn');
+            if (state.role === 'host') {
+                playAgainBtn.classList.remove('hidden');
+                playAgainBtn.classList.add('inline-flex');
+            } else {
+                playAgainBtn.classList.add('hidden');
+            }
+
+            // 完整全班成績單
+            const tableEl = document.getElementById('finalScoreTable');
+            tableEl.innerHTML = sortedPlayers.map((p, idx) => {
+                const rank = idx + 1;
+                const isMe = p.id === state.playerId;
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl ${isMe ? 'bg-amber-100 border-2 border-amber-400' : 'bg-gray-50 border border-gray-200'}">
+                        <div class="flex items-center gap-3">
+                            <span class="w-7 h-7 rounded-full ${rank <= 3 ? 'bg-purple-700 text-white' : 'bg-gray-200 text-gray-700'} font-black text-xs flex items-center justify-center">${rank}</span>
+                            <span class="bg-purple-100 text-purple-800 text-xs font-black px-2.5 py-1 rounded-lg">${p.classNo}號</span>
+                            <span class="font-black text-gray-900">${escapeHtml(p.name)}</span>
+                        </div>
+                        <div class="flex items-center gap-4 text-sm">
+                            <span class="text-gray-500 font-bold">答對 <strong class="text-emerald-700">${p.correctCount || 0} / ${totalQ}</strong> 題</span>
+                            <span class="font-black text-base text-purple-800 min-w-[75px] text-right">${p.score || 0} 分</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 老師原房重新抽題再玩一局（學生不需重新輸入房號）
+        async function hostRestartLobby() {
+            if (state.role !== 'host' || !state.roomData) return;
+            const cfg = state.roomData.config;
+            const newQuestions = generateQuestionDeck(cfg.qCount, cfg.topics, cfg.qFormat);
+
+            const players = state.roomData.players || {};
+            const resetPlayers = {};
+            Object.keys(players).forEach(pid => {
+                resetPlayers[pid] = {
+                    ...players[pid],
+                    score: 0,
+                    lastDelta: 0,
+                    lastCorrect: false,
+                    streak: 0,
+                    correctCount: 0
+                };
+            });
+
+            await db.ref(`${ROOMS_PATH}/${state.roomPin}`).update({
+                status: 'lobby',
+                currentQIndex: 0,
+                questionStartTime: 0,
+                questions: newQuestions,
+                players: resetPlayers,
+                currentAnswers: null
+            });
+        }
+
+        function exportScoresCSV() {
+            if (!state.roomData || !state.roomData.players) return;
+            const totalQ = state.roomData.questions ? state.roomData.questions.length : 10;
+            const sorted = Object.values(state.roomData.players).sort((a, b) => (b.score || 0) - (a.score || 0) || a.classNo - b.classNo);
+
+            let csvContent = "\uFEFF名次,學號,姓名,總分,答對題數,總題數\n";
+            sorted.forEach((p, i) => {
+                csvContent += `${i + 1},${p.classNo},"${p.name.replace(/"/g, '""')}",${p.score || 0},${p.correctCount || 0},${totalQ}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `LTMPS_Kahoot_小四數學比賽成績_房號${state.roomPin}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti !== 'function') return;
+            confetti({
+                particleCount: 90,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        /**************************************************************
+         * 13. 啟動初始化
+         **************************************************************/
+        window.onload = function () {
+            // 初始化學號下拉選單 (1 - 40 號)
+            const selectEl = document.getElementById('studentClassNo');
+            let optsHtml = '';
+            for (let i = 1; i <= 40; i++) {
+                optsHtml += `<option value="${i}">${i} 號</option>`;
+            }
+            selectEl.innerHTML = optsHtml;
+        };
+    </script>
+</body>
+</html>
